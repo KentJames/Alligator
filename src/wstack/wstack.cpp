@@ -9,6 +9,7 @@
 
 #include "helper_string.h"
 #include "wstack_common.h"
+#include "predict.h"
 #ifdef CUDA_ACCELERATION
 #include "predict.cuh"
 #endif
@@ -256,12 +257,11 @@ int main(int argc, char **argv) {
     
     /* 
        PREDICT
-    */   
-    if (mode == 0){
+    */
 
-	
 
-	if (checkCmdLineFlag(argc, (const char **) argv, "pu") == 0 ||
+
+    	if (checkCmdLineFlag(argc, (const char **) argv, "pu") == 0 ||
 	    checkCmdLineFlag(argc, (const char **) argv, "pv") == 0 ||
 	    checkCmdLineFlag(argc, (const char **) argv, "pw") == 0) {
 	    std::cout << "No u/v/w co-ordinates specified for predict!\n";
@@ -273,10 +273,6 @@ int main(int argc, char **argv) {
 	    pv =  getCmdLineArgumentDouble(argc, (const char **) argv, "pv");
 	    pw =  getCmdLineArgumentDouble(argc, (const char **) argv, "pw");
 	}
-
-
-	
-
 
 	std::vector<std::complex<double>> visq;
 	std::vector<std::complex<double>>  vis;
@@ -310,6 +306,18 @@ int main(int argc, char **argv) {
 	    uvwvec[3*i + 1] = vvec[i];
 	    uvwvec[3*i + 2] = wvec[i];	    
 	}
+
+	
+    	std::cout << "Generating DFT visibilities for error calculation..." << std::flush;
+	visq = predict_visibility_quantized_vec(points,theta,lambda,uvwvec);
+	std::cout << "done\n" << std::flush;
+
+    
+    
+    if (mode == 0){
+
+	
+
 
 
 	
@@ -357,15 +365,7 @@ int main(int argc, char **argv) {
 				 sepkern_n);
 #ifdef CUDA_ACCELERATION
 	}
-#endif
-
-
-	
-	std::cout << "Generating DFT visibilities for error calculation..." << std::flush;
-	visq = predict_visibility_quantized_vec(points,theta,lambda,uvwvec);
-	std::cout << "done\n" << std::flush;
-
-	
+#endif	
 	std::vector<double> error (visq.size(), 0.0);
 	std::transform(vis.begin(),vis.end(),visq.begin(),error.begin(),
 		       [npts](std::complex<double> wstack,
@@ -382,11 +382,6 @@ int main(int argc, char **argv) {
 	double agg_error = std::accumulate(error.begin(), error.end(),0.0);
 	std::cout << "Aggregate Error: " << agg_error<<"\n";
 	std::cout << "Aggregate Error / Npts: " << agg_error/error.size()<<"\n";
-      
-      
-
-	
-
     }
     /* 
        IMAGE
@@ -394,14 +389,21 @@ int main(int argc, char **argv) {
     else {
 	// Does nothing for now.
 
-	
+#ifdef CUDA_ACCELERATION
+	if(cuda_acceleration){
+	    std::cout << "CUDA Kernels not implemented (yet...) \n";
+	    
+
+	} else {
+#endif
+	std::cout << "Image Kernels not implemented (yet...) \n";
 
 
-
-	
+#ifdef CUDA_ACCELERATION
+	}
+#endif
 	return 0;
     }
-
 
     free(sepkern_uv);
     free(sepkern_w);

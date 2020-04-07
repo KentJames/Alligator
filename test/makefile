@@ -2,7 +2,7 @@ include ../user.mk
 
 
 override CXXFLAGS += -fopenmp -std=c++14 -I../src/common
-override LDFLAGS += -L../src/common -lhdf5_r -L../src/wstack -lpredict -lhdf5 -lm -lomp -lfftw3_threads -lfftw3
+override LDFLAGS += -L../src/common -lhdf5_r -L../src/wstack -lpredict -lhdf5 -lm -lgomp -lfftw3_threads -lfftw3
 
 all: test_wstack.out test_deconvolve.out
 

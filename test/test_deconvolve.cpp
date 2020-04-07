@@ -6,6 +6,7 @@
 #include <chrono>
 
 #include "wstack_common.h"
+#include "predict.h"
 #include "helper_string.h"
 
 
@@ -40,7 +41,6 @@ int main(int argc, char **argv){
 
     double du = sepkern_uv->du;
     double dw = sepkern_w->dw;
-    double x0 = sepkern_lm->x0;
 
     int support_uv = sepkern_uv->size;
     int support_w = sepkern_w->size;
@@ -65,7 +65,7 @@ int main(int argc, char **argv){
 #pragma omp parallel
 #pragma omp for schedule(static,1000)
     //#pragma omp for schedule(dynamic)
-    for (std::size_t i = 0; i < npts; ++i){
+    for (auto i = 0; i < npts; ++i){
 
     	visibilities[i] = deconvolve_visibility_(uvwvec[3*i + 0],
 						 uvwvec[3*i + 1],

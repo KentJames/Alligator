@@ -24,28 +24,33 @@ clean:
 	rm -f *.out
 
 ifndef CUDA
-wstack.out: wstack.o libpredict.a
-	$(CXX) wstack.o -o $@  -L ./ -lpredict $(LDFLAGS)
-	cp $@ ../../bin/
+wstack.out: wstack.o wstack_common.o libpredict.a
+	$(CXX) wstack.o wstack_common.o -o $@  -L ./ -lpredict $(LDFLAGS)
+	cp $@ ../../
 else
-wstack.out: wstack.o libpredict.a
-	$(NVCC) wstack.o -o $@  -L ./ -lpredict $(LDFLAGS)
-	cp $@ ../../bin/
+wstack.out: wstack.o wstack_common.o libpredict.a
+	$(NVCC) wstack.o wstack_common.o -o $@  -L ./ -lpredict $(LDFLAGS)
+	cp $@ ../../
 endif
 
 wstack.o: wstack.cpp
+	$(CXX) -c $^ -o $@ $(CXXFLAGS)
+
+wstack_common.o: wstack_common.cpp
 	$(CXX) -c $^ -o $@ $(CXXFLAGS)
 
 predict.o: predict.cpp
 	$(CXX) -c $^ -o $@ $(CXXFLAGS)
 
 
+
+
 ifndef CUDA
-libpredict.a: predict.o
+libpredict.a: predict.o wstack_common.o
 	ar rcs $@ $^ 
 else
 predict_cu.o: predict.cu
 	$(NVCC) -c $^ -o $@ $(CUDA_FLAGS)
-libpredict.a: predict.o predict_cu.o
+libpredict.a: predict.o predict_cu.o wstack_common.o
 	ar rcs $@ $^
 endif

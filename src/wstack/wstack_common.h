@@ -1,4 +1,3 @@
-
 #include "hdf5.cuh"
 
 #ifndef WSTACK_H
@@ -17,7 +16,10 @@ constexpr T PI = T(3.1415926535897932385L);
 /*
   The purpose of these templates is to implement a lightweight numerical type agnostic way of
   doing multidimensional array access and operations. A good implementation seems
-  lacking in C++.
+  lacking in C++. 
+
+  I'd rather have avoided doing it but here we are. It's basically just syntactic
+  sugar defined around a normal std::vector
 
   It allows arbitrary striding and data shapes.
 */
@@ -181,7 +183,44 @@ private:
 };
 
 
-// Prototypes for generating visibilities
+
+
+void multiply_fresnel_pattern(vector2D<std::complex<double>>& fresnel,
+			      vector2D<std::complex<double>>& sky,
+			      int t);
+void zero_pad_2Darray(const vector2D<std::complex<double>>& array,
+		      vector2D<std::complex<double>>& padded_array,
+		      double x0);
+
+void fft_shift_2Darray(vector2D<std::complex<double>>& array);
+
+void memcpy_plane_to_stack(vector2D<std::complex<double>>&plane,
+			   vector3D<std::complex<double>>&stacks,
+			   std::size_t grid_size,
+			   std::size_t planei);
+
+vector2D<std::complex<double>>
+generate_fresnel(double theta,
+		 double lam,
+		 double dw,
+		 double x0);
+
+//Quantises our sources onto the sky.
+void generate_sky(const std::vector<double>& points,
+		  vector2D<std::complex<double>>& sky, // We do this by reference because of FFTW planner.
+		  double theta,
+		  double lam,
+		  double du,
+		  double dw,
+		  double x0,
+		  struct sep_kernel_data *grid_corr_lm,
+		  struct sep_kernel_data *grid_corr_n);
+
+std::vector<double>generate_random_points(int npts, double theta);
+std::vector<double> generate_testcard_dataset(double theta);
+std::vector<double> generate_testcard_dataset_simple(double theta);
+
+// Various inlines for generating visibilities, mostly useful for testing
 
 static inline std::vector<std::vector<double>> generate_random_visibilities(double theta,
 							      double lambda,
@@ -292,9 +331,9 @@ static inline std::vector<std::vector<double>> generate_line_visibilities(double
 }
 
 static inline std::vector<double> generate_line_visibilities_(double theta,
-							    double lambda,
-							    double v,
-							    double dw,
+							      double lambda,
+							      double v,
+							      double dw,
 							      int npts){
 
     
@@ -314,204 +353,5 @@ static inline std::vector<double> generate_line_visibilities_(double theta,
 
     return vis;
 }
-
-
-
-
-
-// W Stac
-
-
-std::complex<double> predict_visibility(const std::vector<double>& points,
-					double u,
-					double v,
-					double w);
-
-std::complex<double> predict_visibility_quantized_vec(const std::vector<double>& points,
-						      double theta,
-						      double lam,
-						      double u,
-						      double v,
-						      double w);
-
-
-std::vector<std::complex<double> > predict_visibility_quantized_vec(const std::vector<double>& points,
-								double theta,
-								double lam,
-								std::vector<double> uvwvec);
-
-vector2D<std::complex<double>> generate_fresnel(double theta,
-						double lam,
-						double dw,
-						double x0);
-
-//Quantises our sources onto the sky.
-void generate_sky(const std::vector<double>& points,
-		  vector2D<std::complex<double>>& sky, // We do this by reference because of FFTW planner.
-		  double theta,
-		  double lam,
-		  double du,
-		  double dw,
-		  double x0,
-		  struct sep_kernel_data *grid_corr_lm,
-		  struct sep_kernel_data *grid_corr_n);
-
-std::vector<double> generate_random_points(int npts, double theta);
-
-std::vector<double> generate_testcard_dataset(double theta);
-std::vector<double> generate_testcard_dataset_simple(double theta);
-
-static inline std::complex<double> deconvolve_visibility(std::vector<double> uvw,
-					   double du,
-					   double dw,
-					   int aa_support_uv,
-					   int aa_support_w,
-					   int oversampling,
-					   int oversampling_w,
-					   int w_planes,
-					   int grid_size,
-					   const vector3D<std::complex<double> >& wstacks,
-					   struct sep_kernel_data *grid_conv_uv,
-					   struct sep_kernel_data *grid_conv_w){
-    // Co-ordinates
-    double u = uvw[0];
-    double v = uvw[1];
-    double w = uvw[2];
-    
-    // Begin De-convolution process using Sze-Tan Kernels.
-    std::complex<double> vis_sze = {0.0,0.0};
-
-    // U/V/W oversample values
-    double flu = u - std::ceil(u/du)*du;
-    double flv = v - std::ceil(v/du)*du;
-    double flw = w - std::ceil(w/dw)*dw;
-    
-    int ovu = static_cast<int>(std::floor(std::abs(flu)/du * oversampling));
-    int ovv = static_cast<int>(std::floor(std::abs(flv)/du * oversampling));
-    int ovw = static_cast<int>(std::floor(std::abs(flw)/dw * oversampling_w));   
-    
-    int aa_h = std::floor(aa_support_uv/2);
-    int aaw_h = std::floor(aa_support_w/2);
-
-    for(int dwi = -aaw_h; dwi < aaw_h; ++dwi){
-	
-    	int dws = static_cast<int>(std::ceil(w/dw)) + static_cast<int>(std::floor(w_planes/2)) + dwi;
-    	int aas_w = aa_support_w * ovw + (dwi+aaw_h);
-    	double gridconv_w = grid_conv_w->data[aas_w];
-	
-    	for(int dvi = -aa_h; dvi < aa_h; ++dvi){
-	    
-    	    int dvs = static_cast<int>(std::ceil(v/du)) + grid_size + dvi;
-    	    int aas_v = aa_support_uv * ovv + (dvi+aa_h);
-    	    double gridconv_uv = gridconv_w * grid_conv_uv->data[aas_v];
-	    
-    	    for(int dui = -aa_h; dui < aa_h; ++dui){
-		
-    		int dus = static_cast<int>(std::ceil(u/du)) + grid_size + dui; 
-    		int aas_u = aa_support_uv * ovu + (dui+aa_h);
-    		double gridconv_u = grid_conv_uv->data[aas_u];
-    		double gridconv_uvw = gridconv_uv * gridconv_u;
-    		vis_sze += (wstacks(dus,dvs,dws) * gridconv_uvw );
-    	    }
-    	}
-    }
-
-
-    return vis_sze;
-}
-
-static inline std::complex<double> deconvolve_visibility_(double u,
-					    double v,
-					    double w,
-					   double du,
-					   double dw,
-					   int aa_support_uv,
-					   int aa_support_w,
-					   int oversampling,
-					   int oversampling_w,
-					   int w_planes,
-					   int grid_size,
-					   const vector3D<std::complex<double> >& wstacks,
-					   struct sep_kernel_data *grid_conv_uv,
-					   struct sep_kernel_data *grid_conv_w){
-    
-    // Begin De-convolution process using Sze-Tan Kernels.
-    std::complex<double> vis_sze = {0.0,0.0};
-
-    // U/V/W oversample values
-    double flu = u - std::ceil(u/du)*du;
-    double flv = v - std::ceil(v/du)*du;
-    double flw = w - std::ceil(w/dw)*dw;
-    
-    // int ovu = static_cast<int>(std::floor(std::abs(flu)/du)) * oversampling;
-    // int ovv = static_cast<int>(std::floor(std::abs(flv)/du)) * oversampling;
-    // int ovw = static_cast<int>(std::floor(std::abs(flw)/dw)) * oversampling_w;   
-
-    int ovu = static_cast<int>(std::floor(std::abs(flu)/du * oversampling));
-    int ovv = static_cast<int>(std::floor(std::abs(flv)/du * oversampling));
-    int ovw = static_cast<int>(std::floor(std::abs(flw)/dw * oversampling_w));   
-    
-
-    
-    int aa_h = std::floor(aa_support_uv/2);
-    int aaw_h = std::floor(aa_support_w/2);
-
-
-    for(int dwi = -aaw_h; dwi < aaw_h; ++dwi){
-	
-	int dws = static_cast<int>(std::ceil(w/dw)) + static_cast<int>(std::floor(w_planes/2)) + dwi;
-	int aas_w = aa_support_w * ovw + (dwi+aaw_h);
-	double gridconv_w = grid_conv_w->data[aas_w];
-	
-	for(int dvi = -aa_h; dvi < aa_h; ++dvi){
-	    
-	    int dvs = static_cast<int>(std::ceil(v/du)) + grid_size + dvi;
-	    int aas_v = aa_support_uv * ovv + (dvi+aa_h);
-	    double gridconv_uv = gridconv_w * grid_conv_uv->data[aas_v];
-	    
-	    for(int dui = -aa_h; dui < aa_h; ++dui){
-		
-		int dus = static_cast<int>(std::ceil(u/du)) + grid_size + dui; 
-		int aas_u = aa_support_uv * ovu + (dui+aa_h);
-		double gridconv_u = grid_conv_uv->data[aas_u];
-		double gridconv_uvw = gridconv_uv * gridconv_u;
-		vis_sze += (wstacks(dus,dvs,dws) * gridconv_uvw );
-	    }
-	}
-    }
-
-    return vis_sze;
-}
-
-
-
-std::vector<std::complex<double> > wstack_predict(double theta,
-						  double lam,
-						  const std::vector<double>& points,
-						  std::vector<double> uvwvec,
-						  double du, // Sze-Tan Optimum Spacing in U/V
-						  double dw, // Sze-Tan Optimum Spacing in W
-						  int aa_support_uv,
-						  int aa_support_w,
-						  double x0,
-						  struct sep_kernel_data *grid_conv_uv,
-						  struct sep_kernel_data *grid_conv_w,
-						  struct sep_kernel_data *grid_corr_lm,
-						  struct sep_kernel_data *grid_corr_n);
-
-std::vector<std::vector<std::complex<double>>> wstack_predict_lines(double theta,
-								    double lam,
-								    const std::vector<double>& points, // Sky points
-								    std::vector<std::vector<double>> uvwvec, // U/V/W points to predict.
-								    double du, // Sze-Tan Optimum Spacing in U/V
-								    double dw, // Sze-Tan Optimum Spacing in W
-								    int aa_support_uv,
-								    int aa_support_w,
-								    double x0,
-								    struct sep_kernel_data *grid_conv_uv,
-								    struct sep_kernel_data *grid_conv_w,
-								    struct sep_kernel_data *grid_corr_lm,
-								    struct sep_kernel_data *grid_corr_n);
-
 
 #endif

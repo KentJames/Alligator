@@ -6,6 +6,7 @@
 #include <chrono>
 
 #include "wstack_common.h"
+#include "predict.h"
 #include "helper_string.h"
 
 
@@ -168,7 +169,7 @@ int main(int argc, char **argv){
 
     agg_error = 0.0;
     std::size_t line_size = 0;
-    for (int i = 0; i < uvw_lines.size(); ++i){
+    for (std::vector<std::vector<double> >::size_type i = 0; i < uvw_lines.size(); ++i){
     	line_size += vis_lines[i].size();
     	std::vector<double> errorl (vis_lines[i].size(),0.0);
     	vis_dft = predict_visibility_quantized_vec(testcard_points,
@@ -242,7 +243,6 @@ int main(int argc, char **argv){
     			  const std::complex<double> dft)
     		   -> double { return std::abs(dft-wstack);});
 
-    double agg_err2;
     agg_error = std::accumulate(error_cc2.begin(), error_cc2.end(), 0.0);
     
     std::cout << "Aggregate Error: " << agg_error/error.size() << "\n";

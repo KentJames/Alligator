@@ -1,7 +1,7 @@
-CC	      = clang
-CXX           = clang++
+CC	      = gcc
+CXX           = g++
 NVCC          = nvcc
-LINKER        = clang++
+LINKER        = g++
 CPPFLAGS      ?=
 CXXFLAGS      ?= -O3 -Wall -pedantic 
 NVCCFLAGS     ?= -O3 -Xcompiler "-Wall" #-Xptxas -v
