@@ -10,6 +10,7 @@
 #include "helper_string.h"
 #include "wstack_common.h"
 #include "predict.h"
+#include "image.h"
 #ifdef CUDA_ACCELERATION
 #include "predict.cuh"
 #endif
@@ -308,7 +309,7 @@ int main(int argc, char **argv) {
 	}
 
 	
-    	std::cout << "Generating DFT visibilities for error calculation..." << std::flush;
+    	std::cout << "Generating DFT visibilities from sky point source model..." << std::flush;
 	visq = predict_visibility_quantized_vec(points,theta,lambda,uvwvec);
 	std::cout << "done\n" << std::flush;
 
@@ -325,7 +326,7 @@ int main(int argc, char **argv) {
 	
 	
 #ifdef CUDA_ACCELERATION
-	if(cuda_acceleration){
+	if (cuda_acceleration){
 
 	    // Placeholder for now.
 	    // TODO: Add import from file.
@@ -396,7 +397,19 @@ int main(int argc, char **argv) {
 
 	} else {
 #endif
-	std::cout << "Image Kernels not implemented (yet...) \n";
+	    wstack_image(theta,
+			 lambda,
+			 visq,
+			 uvwvec,
+			 du,
+			 dw,
+			 support_uv,
+			 support_w,
+			 x0,
+			 sepkern_uv,
+			 sepkern_w,
+			 sepkern_lm,
+			 sepkern_n);
 
 
 #ifdef CUDA_ACCELERATION

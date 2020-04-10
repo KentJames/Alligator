@@ -16,7 +16,6 @@
 
 #include "wstack_common.h"
 
-
 std::vector<double> generate_random_points(int npts,
 					   double theta){
 
@@ -162,6 +161,36 @@ void generate_sky(const std::vector<double>& points,
     
 }
 
+// I defined this for mixing vector3D and vector2D. Ugly but does the job.
+// Really would rather clean up the generic side of this over time.
+void multiply_fresnel_pattern(vector2D<std::complex<double>>& fresnel,
+			      vector3D<std::complex<double>>& sky,
+			      int t,
+			      std::size_t planei){
+    assert(fresnel.size() == sky.d1s() * sky.d2s());
+    std::complex<double> ft = {0.0,0.0};
+    std::complex<double> st = {0.0,0.0};
+    std::complex<double> test = {0.0,0.0};
+
+    size_t grid_sizex = fresnel.d1s();
+    size_t grid_sizey = fresnel.d2s();
+    
+    for (std::size_t j = 0; j < grid_sizey; ++j){
+	for (std::size_t i = 0; i < grid_sizex; ++i){
+	    ft = fresnel(i,j);
+	    st = sky(i,j,planei);	
+	
+	    if (t == 1){
+		sky(i,j,planei) = st * ft;
+	    } else {
+	    
+		if (ft == test) continue; // Otherwise std::pow goes a bit fruity
+		sky(i,j,planei) = st  * std::pow(ft,t);
+	    }
+	}
+    }
+}
+
 
 void multiply_fresnel_pattern(vector2D<std::complex<double>>& fresnel,
 			      vector2D<std::complex<double>>& sky,
@@ -171,8 +200,8 @@ void multiply_fresnel_pattern(vector2D<std::complex<double>>& fresnel,
     std::complex<double> st = {0.0,0.0};
     std::complex<double> test = {0.0,0.0};
 
-    size_t grid_sizex = fresnel.d1s();
-    size_t grid_sizey = fresnel.d2s();
+    std::size_t grid_sizex = fresnel.d1s();
+    std::size_t grid_sizey = fresnel.d2s();
     
     for (std::size_t j = 0; j < grid_sizey; ++j){
 	for (std::size_t i = 0; i < grid_sizex; ++i){
@@ -189,6 +218,24 @@ void multiply_fresnel_pattern(vector2D<std::complex<double>>& fresnel,
 	}
     }
 }
+
+// void zero_pad_2Darray(const vector3D<std::complex<double>>& array,
+// 		      vector2D<std::complex<double>>& padded_array,
+// 		      double x0,
+// 		      std::size_t planei){
+
+//     int x0i = static_cast<int>(std::round(1.0/x0));
+//     std::cout << "xoi: " << x0i << "\n";
+//     int i0 = padded_array.d1s()/x0i;
+//     int i1 = 3*(padded_array.d1s()/x0i);
+//     int j0 = padded_array.d2s()/x0i;
+//     int j1 = 3*(padded_array.d2s()/x0i);
+//     for(int j = j0; j < j1; ++j){
+// 	for(int i = i0; i < i1; ++i){
+// 	    padded_array(i,j) = array(i-i0,j-j0,planei);
+// 	}
+//     }
+// }
 
 
 void zero_pad_2Darray(const vector2D<std::complex<double>>& array,
@@ -208,39 +255,12 @@ void zero_pad_2Darray(const vector2D<std::complex<double>>& array,
     }
 }
 
-// Stealing Peters code has become the hallmark of my PhD.
-void fft_shift_2Darray(vector2D<std::complex<double>>& array){
-
-    std::size_t grid_sizex = array.d1s();
-    std::size_t grid_sizey = array.d2s();
-    
-    assert(grid_sizex % 2 == 0);
-    assert(grid_sizey % 2 == 0);
-    int i1,j1;
-    for (std::size_t j = 0; j < grid_sizex; ++j){
-	for (std::size_t i = 0; i < grid_sizey/2; ++i){
-	    // int ix0 = j * grid_sizex + i;
-	    // int ix1 = (ix0 + (grid_sizex + 1) * (grid_sizex/2)) % (grid_sizex * grid_sizey);
-
-	    i1 = i + grid_sizex/2;
-	    if (j < grid_sizey/2){
-		j1 = j + grid_sizey/2;
-	    } else {
-		j1 = j - grid_sizey/2;
-	    }
-	   
-	    std::complex<double> temp = array(i,j);
-	    array(i,j) = array(i1,j1);
-	    array(i1,j1) = temp;
-	}
-    }
-}
-
 
 void memcpy_plane_to_stack(vector2D<std::complex<double>>&plane,
 			   vector3D<std::complex<double>>&stacks,
 			   std::size_t grid_size,
-			   std::size_t planei){
+			   std::size_t planei,
+			   std::size_t direction){
 
     //Calculate memory copy amount based on striding information.
     //Assume strides for n=1 and n=2 dimensions are the same between
@@ -275,6 +295,11 @@ void memcpy_plane_to_stack(vector2D<std::complex<double>>&plane,
 
     std::complex<double> *wp = stacks.pp(planei);  
     std::complex<double> *pp = plane.dp();
-    std::memcpy(wp,pp,copy_size);
+
+    if (direction){
+	std::memcpy(wp,pp,copy_size);
+    } else {
+	std::memcpy(pp,wp,copy_size);
+    }
 
 }

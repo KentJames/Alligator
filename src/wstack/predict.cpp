@@ -16,11 +16,6 @@
 #include "wstack_common.h"
 #include "predict.h"
 
-// We use non-unit strides to alleviate cache thrashing effects.
-    const int element_stride = 1;
-    const int row_stride = 8;
-    const int matrix_stride = 10;
-
 /*
   Predicts a visibility at a particular point using the direct fourier transform.
  */
@@ -138,19 +133,20 @@ predict_visibility_quantized_vec(const std::vector<double>& points,
 
 
 
-std::vector<std::complex<double>> wstack_predict(double theta,
-						 double lam,
-						 const std::vector<double>& points, // Sky points
-						 std::vector<double> uvwvec, // U/V/W points to predict.
-						 double du, // Sze-Tan Optimum Spacing in U/V
-						 double dw, // Sze-Tan Optimum Spacing in W
-						 int aa_support_uv,
-						 int aa_support_w,
-						 double x0,
-						 struct sep_kernel_data *grid_conv_uv,
-						 struct sep_kernel_data *grid_conv_w,
-						 struct sep_kernel_data *grid_corr_lm,
-						 struct sep_kernel_data *grid_corr_n){
+std::vector<std::complex<double>>
+wstack_predict(double theta,
+	       double lam,
+	       const std::vector<double>& points, // Sky points
+	       std::vector<double> uvwvec, // U/V/W points to predict.
+	       double du, // Sze-Tan Optimum Spacing in U/V
+	       double dw, // Sze-Tan Optimum Spacing in W
+	       int aa_support_uv,
+	       int aa_support_w,
+	       double x0,
+	       struct sep_kernel_data *grid_conv_uv,
+	       struct sep_kernel_data *grid_conv_w,
+	       struct sep_kernel_data *grid_corr_lm,
+	       struct sep_kernel_data *grid_corr_n){
 
     
     int grid_size = static_cast<int>(std::floor(theta * lam));
@@ -308,19 +304,20 @@ std::vector<std::complex<double>> wstack_predict(double theta,
 
 
 //Takes lines of visibilities.
-std::vector<std::vector<std::complex<double>>> wstack_predict_lines(double theta,
-						       double lam,
-						       const std::vector<double>& points, // Sky points
-						       std::vector<std::vector<double>> uvwvec, // U/V/W points to predict.
-						       double du, // Sze-Tan Optimum Spacing in U/V
-						       double dw, // Sze-Tan Optimum Spacing in W
-						       int aa_support_uv,
-						       int aa_support_w,
-						       double x0,
-						       struct sep_kernel_data *grid_conv_uv,
-						       struct sep_kernel_data *grid_conv_w,
-						       struct sep_kernel_data *grid_corr_lm,
-						       struct sep_kernel_data *grid_corr_n){
+std::vector<std::vector<std::complex<double>>>
+wstack_predict_lines(double theta,
+		     double lam,
+		     const std::vector<double>& points, // Sky points
+		     std::vector<std::vector<double>> uvwvec, // u/v/w points to predict.
+		     double du, // Sze-Tan Optimum Spacing in u/v
+		     double dw, // Sze-Tan Optimum Spacing in w
+		     int aa_support_uv,
+		     int aa_support_w,
+		     double x0,
+		     struct sep_kernel_data *grid_conv_uv,
+		     struct sep_kernel_data *grid_conv_w,
+		     struct sep_kernel_data *grid_corr_lm,
+		     struct sep_kernel_data *grid_corr_n){
     
     
     int grid_size = static_cast<int>(std::floor(theta * lam));

@@ -1,5 +1,5 @@
-#ifndef PREDICTCU_H
-#define PREDICTCU_H
+#ifndef PREDICT_CUH
+#define PREDICT_CUH
 
 
 template <typename FloatType>
