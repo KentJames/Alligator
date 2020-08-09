@@ -278,8 +278,8 @@ int main(int argc, char **argv) {
 
 	std::vector<std::complex<double>> visq;
 	std::vector<std::complex<double>>  vis;
-	//std::vector<double> points = generate_testcard_dataset(theta);
-	std::vector<double> points = {0.0,0.1};
+	std::vector<double> points = generate_testcard_dataset(theta);
+	//std::vector<double> points = {0.0,0.0,0.02,0.02,-0.01,0};
  	std::vector<double> uvec;
 	std::vector<double> vvec;
 	std::vector<double> wvec;
@@ -296,12 +296,18 @@ int main(int argc, char **argv) {
 	    wvec.resize(npts);
 	    std::fill(wvec.begin(), wvec.end(),pw);
 	    
-	} else { 
+	} else if(mode == 1) {
+
+	    uvec = generate_random_visibilities_1D_uv_gaussian(theta,lambda,npts);
+	    vvec = generate_random_visibilities_1D_uv_gaussian(theta,lambda,npts);
+	    wvec = generate_random_visibilities_1D_w_gaussian(theta,lambda,dw,npts);
+	    
+	} else {
 	    uvec = generate_random_visibilities_1D_uv(theta,lambda,npts);
 	    vvec = generate_random_visibilities_1D_uv(theta,lambda,npts);
 	    wvec = generate_random_visibilities_1D_w(theta,lambda,dw,npts);
-	    
 	}
+	    
 	
 	for (std::size_t i = 0; i < uvec.size(); ++i){
 	    uvwvec[3*i + 0] = uvec[i];
@@ -322,12 +328,6 @@ int main(int argc, char **argv) {
     
     if (mode == 0){
 
-	
-	vector2D<std::complex<double> > skyp(oversampg,oversampg,{0.0,0.0}, element_stride, row_stride);
-	std::cout << "Generating sky... " << std::flush;
-	generate_sky(points,skyp,theta,lambda,du,dw,x0,sepkern_lm,sepkern_n);    
-	std::cout << "done\n" << std::flush;
-	
 #ifdef CUDA_ACCELERATION
 	if (cuda_acceleration){
 
@@ -358,7 +358,6 @@ int main(int argc, char **argv) {
 				 lambda,
 				 points,
 				 uvwvec,
-				 skyp,
 				 du,
 				 dw,
 				 support_uv,
@@ -372,6 +371,23 @@ int main(int argc, char **argv) {
 	}
 #endif	
 
+
+	std::vector<double> error (visq.size(), 0.0);
+	std::transform(vis.begin(),vis.end(),visq.begin(),error.begin(),
+		       [npts](std::complex<double> wstack,
+			      std::complex<double> dft)
+		       -> double { return std::abs(dft-wstack);});
+    
+	// for(int i = 0; i < 32; ++ i){
+    
+	std::cout << "Example Vis: " << vis[0] << "\n" << std::flush;
+	std::cout << "Example DFT Vis: " << visq[0] << "\n" << std::flush;
+	std::cout << "Example Error: " << error[0] << "\n" << std::flush;
+	// }
+	//std::for_each(error.begin(), error.end(), [](const double n) { std::cout << n << " ";});
+	double agg_error = std::accumulate(error.begin(), error.end(),0.0);
+	std::cout << "Aggregate Error: " << agg_error<<"\n";
+	std::cout << "Aggregate Error / Npts: " << agg_error/error.size()<<"\n";
     }
     /* 
        IMAGE
@@ -423,47 +439,13 @@ int main(int argc, char **argv) {
 		}
 
 	    }
-	    return 0;
 	    
-	    // vis = wstack_predict(theta,
-	    // 			 lambda,
-	    // 			 points,
-	    // 			 uvwvec,
-	    // 			 wstack_sky,
-	    // 			 du,
-	    // 			 dw,
-	    // 			 support_uv,
-	    // 			 support_w,
-	    // 			 x0,
-	    // 			 sepkern_uv,
-	    // 			 sepkern_w,
-	    // 			 sepkern_lm,
-	    // 			 sepkern_n);
-
-	    
-
 #ifdef CUDA_ACCELERATION
 	}
 #endif
 	
     }
 
-    std::vector<double> error (visq.size(), 0.0);
-    std::transform(vis.begin(),vis.end(),visq.begin(),error.begin(),
-		   [npts](std::complex<double> wstack,
-			  std::complex<double> dft)
-		   -> double { return std::abs(dft-wstack);});
-    
-    // for(int i = 0; i < 32; ++ i){
-    
-    std::cout << "Example Vis: " << vis[0] << "\n" << std::flush;
-    std::cout << "Example DFT Vis: " << visq[0] << "\n" << std::flush;
-    std::cout << "Example Error: " << error[0] << "\n" << std::flush;
-    // }
-	//std::for_each(error.begin(), error.end(), [](const double n) { std::cout << n << " ";});
-    double agg_error = std::accumulate(error.begin(), error.end(),0.0);
-    std::cout << "Aggregate Error: " << agg_error<<"\n";
-    std::cout << "Aggregate Error / Npts: " << agg_error/error.size()<<"\n";
     
     free(sepkern_uv);
     free(sepkern_w);

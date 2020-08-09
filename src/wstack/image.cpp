@@ -161,7 +161,6 @@ wstack_image(double theta,
     iodims_howmany[0].n = 1;
     iodims_howmany[0].is = 1;
     iodims_howmany[0].os = 1;
-    std::cout << "Planning FFT's";
     // Here we do the transforms in-place to save memory
     for(std::size_t i = 0; i < w_planes; ++i){
 	plan[i] = fftw_plan_guru_dft(2, iodims_plane, 1, iodims_howmany,

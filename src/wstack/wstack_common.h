@@ -454,9 +454,25 @@ static inline std::vector<double> generate_random_visibilities_1D_uv(double thet
     std::default_random_engine generator;
     generator.seed(seed);
     std::uniform_real_distribution<double> distribution(-theta*lambda/2,theta*lambda/2);
-   
     for(int i = 0; i < npts; ++i){	
 	vis[i] = distribution(generator);
+    }
+
+    return vis;
+}
+
+static inline std::vector<double> generate_random_visibilities_1D_uv_gaussian(double theta,
+								   double lambda,
+									    int npts){
+
+    std::vector<double> vis(npts, 0.0);
+    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine generator;
+    generator.seed(seed);
+    std::normal_distribution<double> distribution(0,theta*lambda/8);
+    for(int i = 0; i < npts; ++i){
+	vis[i] = distribution(generator);
+	if((vis[i] < -theta*lambda/2) || (vis[i] >= theta*lambda/2)) --i;
     }
 
     return vis;
@@ -466,8 +482,6 @@ static inline std::vector<double> generate_random_visibilities_1D_w(double theta
 							      double lambda,
 							      double dw,
 							      int npts){
-
-    
     std::vector<double> vis(npts, 0.0);
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator;
@@ -478,6 +492,23 @@ static inline std::vector<double> generate_random_visibilities_1D_w(double theta
 	vis[i] = distribution_w(generator);
     }
 
+    return vis;
+}
+
+static inline std::vector<double> generate_random_visibilities_1D_w_gaussian(double theta,
+									     double lambda,
+									     double dw,
+									     int npts){
+    std::vector<double> vis(npts, 0.0);
+    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine generator;
+    generator.seed(seed);
+    std::normal_distribution<double> distribution_w(0,dw/4);
+    for(int i = 0; i < npts; ++i){	
+	vis[i] = distribution_w(generator);
+	if((vis[i] < -dw) || (vis[i] > dw)) --i; 
+    }
+    
     return vis;
 }
 

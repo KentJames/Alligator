@@ -154,8 +154,7 @@ std::vector<std::complex<double> >
 wstack_predict(double theta,
 	       double lam,
 	       const std::vector<double>& points,
-	       std::vector<double> uvwvec,
-	       vector2D<std::complex<double>> skyp,
+	       const std::vector<double> uvwvec,
 	       double du, // Sze-Tan Optimum Spacing in U/V
 	       double dw, // Sze-Tan Optimum Spacing in W
 	       int aa_support_uv,
@@ -170,8 +169,7 @@ std::vector<std::vector<std::complex<double>>>
 wstack_predict_lines(double theta,
 		     double lam,
 		     const std::vector<double>& points, // Sky points
-		     std::vector<std::vector<double>> uvwvec, // U/V/W points to predict.
-		     vector2D<std::complex<double>> skyp, // Don't pass this by reference, as we modify it. Worth the memory penalty.
+		     const std::vector<std::vector<double>> uvwvec, // U/V/W points to predict.
 		     double du, // Sze-Tan Optimum Spacing in U/V
 		     double dw, // Sze-Tan Optimum Spacing in W
 		     int aa_support_uv,
