@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <cstdlib>
 #include <algorithm>
 #include <complex>
@@ -20,7 +21,7 @@ void showHelp(){
     std::cout<<"\ncuStacker v0.1\n";
     std::cout<<"James Kent <jck42@cam.ac.uk>\n";
     std::cout<<"A W-Stacking Implementation originally devised by Sze-Tan \n";
-    std::cout<<"University of Cambridge, 2019\n\n";
+    std::cout<<"University of Cambridge, 2020\n\n";
 
     std::cout<<"General Parameters: \n";
     std::cout<<"\t-theta               Field of View (Radians)\n";
@@ -277,8 +278,8 @@ int main(int argc, char **argv) {
 
 	std::vector<std::complex<double>> visq;
 	std::vector<std::complex<double>>  vis;
-	std::vector<double> points = generate_testcard_dataset(theta);
-	
+	//std::vector<double> points = generate_testcard_dataset(theta);
+	std::vector<double> points = {0.0,0.1};
  	std::vector<double> uvec;
 	std::vector<double> vvec;
 	std::vector<double> wvec;
@@ -313,17 +314,19 @@ int main(int argc, char **argv) {
 	visq = predict_visibility_quantized_vec(points,theta,lambda,uvwvec);
 	std::cout << "done\n" << std::flush;
 
+
+    double x0ih = std::round(0.5/x0);
+    int grid_size = static_cast<int>(std::floor(theta*lambda));
+    int oversampg = static_cast<int>(x0ih * grid_size);
     
     
     if (mode == 0){
 
 	
-
-
-
-	
-	
-	
+	vector2D<std::complex<double> > skyp(oversampg,oversampg,{0.0,0.0}, element_stride, row_stride);
+	std::cout << "Generating sky... " << std::flush;
+	generate_sky(points,skyp,theta,lambda,du,dw,x0,sepkern_lm,sepkern_n);    
+	std::cout << "done\n" << std::flush;
 	
 #ifdef CUDA_ACCELERATION
 	if (cuda_acceleration){
@@ -350,11 +353,12 @@ int main(int argc, char **argv) {
 #endif	    
 	    
 	    std::cout << "##### W Stacking #####\n"; 	    
-	    
+
 	    vis = wstack_predict(theta,
 				 lambda,
 				 points,
 				 uvwvec,
+				 skyp,
 				 du,
 				 dw,
 				 support_uv,
@@ -367,29 +371,12 @@ int main(int argc, char **argv) {
 #ifdef CUDA_ACCELERATION
 	}
 #endif	
-	std::vector<double> error (visq.size(), 0.0);
-	std::transform(vis.begin(),vis.end(),visq.begin(),error.begin(),
-		       [npts](std::complex<double> wstack,
-			      std::complex<double> dft)
-		       -> double { return std::abs(dft-wstack);});
 
-	// for(int i = 0; i < 32; ++ i){
-	    
-	//     std::cout << "Example Vis: " << vis[256000 + i] << "\n" << std::flush;
-	//     std::cout << "Example DFT Vis: " << visq[256000 + i] << "\n" << std::flush;
-	//     std::cout << "Example Error: " << error[256000 + i] << "\n" << std::flush;
-	// }
-	//std::for_each(error.begin(), error.end(), [](const double n) { std::cout << n << " ";});
-	double agg_error = std::accumulate(error.begin(), error.end(),0.0);
-	std::cout << "Aggregate Error: " << agg_error<<"\n";
-	std::cout << "Aggregate Error / Npts: " << agg_error/error.size()<<"\n";
     }
     /* 
        IMAGE
     */
     else {
-	// Does nothing for now.
-
 #ifdef CUDA_ACCELERATION
 	if(cuda_acceleration){
 	    std::cout << "CUDA Kernels not implemented (yet...) \n";
@@ -397,27 +384,87 @@ int main(int argc, char **argv) {
 
 	} else {
 #endif
-	    wstack_image(theta,
-			 lambda,
-			 visq,
-			 uvwvec,
-			 du,
-			 dw,
-			 support_uv,
-			 support_w,
-			 x0,
-			 sepkern_uv,
-			 sepkern_w,
-			 sepkern_lm,
-			 sepkern_n);
+	    //for(int i = 0; i < uvwvec.size(); ++i) uvwvec[i] = 0.0;
+	    //std::complex<double> visz = {1.0,0.0};
+	    //for(int i = 0; i < visq.size(); ++i) visq[i] = visz;
+	    std::cout << "Visq example: " << visq[0] << "\n";
+	    vector2D<std::complex<double>> wstack_sky = wstack_image(theta,
+								     lambda,
+								     visq,
+								     uvwvec,
+								     du,
+								     dw,
+								     support_uv,
+								     support_w,
+								     x0,
+								     sepkern_uv,
+								     sepkern_w,
+								     sepkern_lm,
+								     sepkern_n);
+	    std::cout << "Wstack size: " <<  wstack_sky.size() << "\n";
+	    std::cout << "Wstack Value at (0,0): " << wstack_sky(oversampg/2,oversampg/2) << "\n";
+	    
+	    // Normalise
+	    for(int i = 0; i < wstack_sky.size(); ++i) wstack_sky(i) /= (float)visq.size();
+	    std::cout << "Normalised Wstack Value at (0,0): " << wstack_sky(oversampg/2,oversampg/2) << "\n";
+	    std::cout << "Normalised Wstack Value at (0,1): " << wstack_sky(oversampg/2,oversampg/2+1) << "\n";
+	    std::cout << "Normalised Wstack Value at (0,2): " << wstack_sky(oversampg/2,oversampg/2+2) << "\n";
+	    std::cout << "Normalised Wstack Value at (0,3): " << wstack_sky(oversampg/2,oversampg/2+3) << "\n";
+	    std::cout << "Normalised Wstack Value at (256,256): " << wstack_sky(oversampg/2+256,oversampg/2+256) << "\n";
+	    std::cout << "Normalised Wstack Value at (0,512): " << wstack_sky(oversampg/2,oversampg/2+512) << "\n";
+	    {
+		std::ofstream file("wstack_sky.out", std::ios::binary);
+		double *row = (double*)malloc(sizeof(double) * oversampg);
+		for(int i = 0; i < oversampg; ++i){
+		    for(int j = 0; j < oversampg; ++j){
+			row[j] = wstack_sky(i,j).real();
+		    }
+		    file.write(reinterpret_cast<char*>(row), sizeof(double) * oversampg );
+		}
 
+	    }
+	    return 0;
+	    
+	    // vis = wstack_predict(theta,
+	    // 			 lambda,
+	    // 			 points,
+	    // 			 uvwvec,
+	    // 			 wstack_sky,
+	    // 			 du,
+	    // 			 dw,
+	    // 			 support_uv,
+	    // 			 support_w,
+	    // 			 x0,
+	    // 			 sepkern_uv,
+	    // 			 sepkern_w,
+	    // 			 sepkern_lm,
+	    // 			 sepkern_n);
+
+	    
 
 #ifdef CUDA_ACCELERATION
 	}
 #endif
-	return 0;
+	
     }
 
+    std::vector<double> error (visq.size(), 0.0);
+    std::transform(vis.begin(),vis.end(),visq.begin(),error.begin(),
+		   [npts](std::complex<double> wstack,
+			  std::complex<double> dft)
+		   -> double { return std::abs(dft-wstack);});
+    
+    // for(int i = 0; i < 32; ++ i){
+    
+    std::cout << "Example Vis: " << vis[0] << "\n" << std::flush;
+    std::cout << "Example DFT Vis: " << visq[0] << "\n" << std::flush;
+    std::cout << "Example Error: " << error[0] << "\n" << std::flush;
+    // }
+	//std::for_each(error.begin(), error.end(), [](const double n) { std::cout << n << " ";});
+    double agg_error = std::accumulate(error.begin(), error.end(),0.0);
+    std::cout << "Aggregate Error: " << agg_error<<"\n";
+    std::cout << "Aggregate Error / Npts: " << agg_error/error.size()<<"\n";
+    
     free(sepkern_uv);
     free(sepkern_w);
     free(sepkern_lm);

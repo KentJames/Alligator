@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 #include <vector>
 #include <cmath>
 #include <chrono>
@@ -95,7 +96,7 @@ predict_visibility_quantized_vec(const std::vector<double>& points,
     std::size_t npts = points.size()/2;
 
 
-    //#pragma omp parallel
+    #pragma omp parallel
     for (std::size_t visi = 0; visi < uvw.size()/3; ++visi){
 	
 	double u = uvw[3 * visi + 0];
@@ -137,7 +138,8 @@ std::vector<std::complex<double>>
 wstack_predict(double theta,
 	       double lam,
 	       const std::vector<double>& points, // Sky points
-	       std::vector<double> uvwvec, // U/V/W points to predict.
+	       const std::vector<double> uvwvec, // U/V/W points to predict.
+	       vector2D<std::complex<double>> skyp,
 	       double du, // Sze-Tan Optimum Spacing in U/V
 	       double dw, // Sze-Tan Optimum Spacing in W
 	       int aa_support_uv,
@@ -172,7 +174,7 @@ wstack_predict(double theta,
     
     // We double our grid size to get the optimal spacing.
     vector3D<std::complex<double> > wstacks(oversampg,oversampg,w_planes,{0.0,0.0},element_stride,row_stride,matrix_stride);
-    vector2D<std::complex<double> > skyp(oversampg,oversampg,{0.0,0.0},element_stride,row_stride);
+    //vector2D<std::complex<double> > skyp(oversampg,oversampg,{0.0,0.0},element_stride,row_stride);
     vector2D<std::complex<double> > plane(oversampg,oversampg,{0.0,0.0},element_stride,row_stride);
     fftw_plan plan;
     std::cout << "Planning fft's... " << std::flush;
@@ -207,12 +209,12 @@ wstack_predict(double theta,
  
     fftw_export_wisdom_to_filename("fftw.wisdom");
     std::cout << "done\n" << std::flush;
-    skyp.clear();
+    //skyp.clear();
     plane.clear();
-    std::cout << "Generating sky... " << std::flush;
-    generate_sky(points,skyp,theta,lam,du,dw,x0,grid_corr_lm,grid_corr_n);
-    std::cout << "Sky: " << skyp(grid_size,grid_size) << "\n";
-    std::cout << "done\n" << std::flush;
+    // std::cout << "Generating sky... " << std::flush;
+    // generate_sky(points,skyp,theta,lam,du,dw,x0,grid_corr_lm,grid_corr_n);
+    // std::cout << "Sky: " << skyp(grid_size,grid_size) << "\n";
+    // std::cout << "done\n" << std::flush;
     fft_shift_2Darray(skyp);
     fft_shift_2Darray(wtransfer);
     multiply_fresnel_pattern(wtransfer,skyp,(std::floor(-w_planes/2)));
@@ -246,6 +248,18 @@ wstack_predict(double theta,
 
     std::vector<std::complex<double> > visibilities(uvwvec.size()/3,{0.0,0.0});
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+     {
+     		std::ofstream file("deconvolved_sky.out", std::ios::binary);
+     		double *row = (double*)malloc(sizeof(double) * oversampg);
+     		for(int i = 0; i < oversampg; ++i){
+     		    for(int j = 0; j < oversampg; ++j){
+     			row[j] = wstacks(i,j,w_planes/2).real();
+     		    }
+     		    file.write(reinterpret_cast<char*>(row), sizeof(double) * oversampg );
+     		}
+		free(row);
+
+    }
 #pragma omp parallel
 #pragma omp for schedule(static,1000)
     for (std::size_t i = 0; i < uvwvec.size()/3; ++i){
@@ -309,6 +323,7 @@ wstack_predict_lines(double theta,
 		     double lam,
 		     const std::vector<double>& points, // Sky points
 		     std::vector<std::vector<double>> uvwvec, // u/v/w points to predict.
+		     vector2D<std::complex<double>> skyp, 
 		     double du, // Sze-Tan Optimum Spacing in u/v
 		     double dw, // Sze-Tan Optimum Spacing in w
 		     int aa_support_uv,
@@ -339,7 +354,7 @@ wstack_predict_lines(double theta,
        
     // We double our grid size to get the optimal spacing.
     vector3D<std::complex<double> > wstacks(oversampg,oversampg,w_planes,{0.0,0.0}, element_stride, row_stride, matrix_stride);
-    vector2D<std::complex<double> > skyp(oversampg,oversampg,{0.0,0.0}, element_stride, row_stride);
+    //    vector2D<std::complex<double> > skyp(oversampg,oversampg,{0.0,0.0}, element_stride, row_stride);
     vector2D<std::complex<double> > plane(oversampg,oversampg,{0.0,0.0}, element_stride, row_stride);
     fftw_plan plan;
     std::cout << "Planning fft's... " << std::flush;
@@ -375,9 +390,9 @@ wstack_predict_lines(double theta,
     std::cout << "done\n" << std::flush;
     skyp.clear();
     plane.clear();
-    std::cout << "Generating sky... " << std::flush;
-    generate_sky(points,skyp,theta,lam,du,dw,x0,grid_corr_lm,grid_corr_n);    
-    std::cout << "done\n" << std::flush;
+    // std::cout << "Generating sky... " << std::flush;
+    // generate_sky(points,skyp,theta,lam,du,dw,x0,grid_corr_lm,grid_corr_n);    
+    // std::cout << "done\n" << std::flush;
     fft_shift_2Darray(skyp);
     fft_shift_2Darray(wtransfer);
     multiply_fresnel_pattern(wtransfer,skyp,(std::floor(-w_planes/2)));
@@ -428,11 +443,8 @@ wstack_predict_lines(double theta,
 							  grid_conv_w);
 	}
     }
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
-    
-    std::cout << "Deconvolve Time: " << duration << "ms \n";;
-   
+
+
     /*
     //Unfortunately LLVM and GCC are woefully behind Microsoft when it comes to parallel algorithm support in the STL!!
 
@@ -458,6 +470,16 @@ wstack_predict_lines(double theta,
 						 grid_conv_w);
 		   });
     */ 
+
+
+
+
+    
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>( t2 - t1 ).count();
+    
+    std::cout << "Deconvolve Time: " << duration << "ms \n";;
+   
 		   
 
     

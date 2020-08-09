@@ -36,7 +36,7 @@ std::vector<double> generate_random_points(int npts,
 
 std::vector<double> generate_testcard_dataset(double theta){
 
-    std::vector<double> points = {0.95,0.95,-0.95,-0.95,0.95,-0.95,-0.95,0.95,0.0,0.5,0.0,-0.5,0.5,0.0,-0.5,0.0};
+    std::vector<double> points = {0.95,0.95,-0.95,-0.95,0.95,-0.95,-0.95,0.95,0.0,0.5,0.0,-0.5,0.5,0.0,-0.5,0.0,0.0,0.0};
     std::transform(points.begin(), points.end(), points.begin(),
 		   [theta](double c) -> double { return c * (theta/2);});
 

@@ -10,6 +10,7 @@
 #include <chrono>
 #include <random>
 #include <algorithm>
+#include <fstream>
 #include <fftw3.h>
 #include <omp.h>
 
@@ -17,9 +18,88 @@
 #include "image.h"
 
 
+
+
+void grid_correct_sky(vector2D<std::complex<double>>& sky,
+		      double theta,
+		      double lam,
+		      double du,
+		      double dw,
+		      int aa_support_uv,
+		      int aa_support_w,
+		      double x0,
+		      struct sep_kernel_data *grid_corr_lm,
+		      struct sep_kernel_data *grid_corr_n){
+
+
+
+    
+    //Grid Sizes
+    int grid_size = static_cast<int>(std::floor(theta*lam));
+    double x0ih = std::round(0.5/x0);
+    int oversampg = static_cast<int>(std::round(x0ih * grid_size));
+
+    //Grid bounds based on throwing away half the map.
+    int sky_bound_low = (oversampg - grid_size)/2;
+    int sky_bound_high = 3 * sky_bound_low;
+    
+
+    
+    // Kernel indexing arithmetic
+    int lm_size_t = grid_corr_lm->size * grid_corr_lm->oversampling;
+    int n_size_t = grid_corr_n->size * grid_corr_n->oversampling;
+    double lm_step = 1.0/(double)lm_size_t;
+    double n_step = 1.0/(double)n_size_t;
+    // Here we throw away half the map and grid correct what is left
+    // As Steve Gull always says, "Throw away half the map, it's useless!!"
+    for(int y = 0; y < oversampg ; ++y){
+
+	double m = (theta / oversampg) * (y - oversampg / 2);
+	int mc = static_cast<int>(std::floor((m / theta + 0.5) *
+					     static_cast<double>(grid_size)));
+	double mq = (double)mc/lam - theta/2;
+	
+
+	
+	for(int x = 0; x < oversampg; ++x){
+
+	    double l = (theta / oversampg) * (x - oversampg / 2);
+	    int lc = static_cast<int>(std::floor((l / theta + 0.5) *
+					     static_cast<double>(grid_size)));
+	    double lq = (double)lc/lam - theta/2;
+	    double n = std::sqrt(1.0 - lq*lq - mq*mq) - 1.0;
+	    int aau = std::floor((du*lq)/lm_step) + lm_size_t/2;
+	    int aav = std::floor((du*mq)/lm_step) + lm_size_t/2;
+	    int aaw = std::floor((dw*n)/n_step) + n_size_t/2;
+
+	    double a = 1.0;
+	    a *= grid_corr_lm->data[aau];
+	    a *= grid_corr_lm->data[aav];
+	    a *= grid_corr_n->data[aaw];
+
+	    if( (x >= sky_bound_low && x < sky_bound_high) &&
+		(y >= sky_bound_low && y < sky_bound_high)){
+		std::complex<double> source = sky(x,y);
+		source = source/a;
+		sky(x,y) = source;
+	    } else {
+		std::complex<double> zero = {0.0,0.0};
+		sky(x,y) = zero;
+	    }	    
+	}
+    }
+}
+
+
+
+
+
+
 // We know the sky should be real but with the imprecision introduced
 // by convolutional gridding, there will be a small imaginary component
-// still.
+// still. Hence why vector2D is instantiated with std::complex<T>
+
+
 vector2D<std::complex<double>>
 wstack_image(double theta,
 	     double lam,
@@ -81,7 +161,7 @@ wstack_image(double theta,
     iodims_howmany[0].n = 1;
     iodims_howmany[0].is = 1;
     iodims_howmany[0].os = 1;
-    
+    std::cout << "Planning FFT's";
     // Here we do the transforms in-place to save memory
     for(std::size_t i = 0; i < w_planes; ++i){
 	plan[i] = fftw_plan_guru_dft(2, iodims_plane, 1, iodims_howmany,
@@ -89,7 +169,9 @@ wstack_image(double theta,
 			      reinterpret_cast<fftw_complex*>(wstacks.pp(i)),
 			      FFTW_BACKWARD,
 			      FFTW_MEASURE);
+	std::cout << "." << std::flush;
     }
+    std::cout << "done\n" << std::flush;
     std::cout << "Convolving 3D Visibilities...";
     std::chrono::high_resolution_clock::time_point t_convolve_start =
 	std::chrono::high_resolution_clock::now();
@@ -110,6 +192,20 @@ wstack_image(double theta,
 			     grid_conv_uv,
 			     grid_conv_w);
     }
+
+    {
+     		std::ofstream file("convolved_sky.out", std::ios::binary);
+     		double *row = (double*)malloc(sizeof(double) * oversampg);
+     		for(int i = 0; i < oversampg; ++i){
+     		    for(int j = 0; j < oversampg; ++j){
+     			row[j] = wstacks(i,j,w_planes/2).real();
+     		    }
+     		    file.write(reinterpret_cast<char*>(row), sizeof(double) * oversampg );
+     		}
+		free(row);
+
+    }
+    
     std::chrono::high_resolution_clock::time_point t_convolve_end =
 	std::chrono::high_resolution_clock::now();
     std::cout << "done \n";
@@ -131,7 +227,7 @@ wstack_image(double theta,
 	fftw_execute(plan[i]);
 	multiply_fresnel_pattern(wtransfer,
 				 wstacks,
-				 w_planes - i,
+				 w_planes/2 - i,
 				 i);
 	// Iteratively add this back to the sky reconstruction.
 	for(std::size_t v = 0; v < oversampg; ++v){
@@ -141,23 +237,12 @@ wstack_image(double theta,
 	}
     }
     // Bring sky back to w=0 co-ordinate
-    multiply_fresnel_pattern(wtransfer,sky,std::floor(-w_planes/2));
+    //multiply_fresnel_pattern(wtransfer,sky,std::floor(w_planes/2));
     fft_shift_2Darray(sky);
-
-    // Extract the central portion of the map.
-    // As Steve Gull always says - "Throw away half the map, its useless!"
-    std::size_t i0 = sky.d1s()/4;
-    std::size_t i1 = 3 * i0;
-    std::size_t j0 = sky.d2s()/4;
-    std::size_t j1 = 3 * j0;
-
-    for(std::size_t j = j0; j < j1; ++j){
-	for(std::size_t i = i0; i < i1; ++i){
-	    image(i-i0,j-j0) = sky(i,j); 
-	}
-    }
-
-
+    grid_correct_sky(sky,theta,lam,
+    du,dw,aa_support_uv, aa_support_w, x0,
+    grid_corr_lm, grid_corr_n);
+    
     
     
     std::chrono::high_resolution_clock::time_point t_wstack_end =
@@ -170,6 +255,6 @@ wstack_image(double theta,
 	(t_wstack_end - t_wstack_start).count();
     std::cout << "W-Stack Time: " << duration_wstack << "ms \n";
     
-    return image;
+    return sky;
 
 }
