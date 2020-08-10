@@ -503,10 +503,10 @@ static inline std::vector<double> generate_random_visibilities_1D_w_gaussian(dou
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator;
     generator.seed(seed);
-    std::normal_distribution<double> distribution_w(0,dw/4);
+    std::normal_distribution<double> distribution_w(0,dw);
     for(int i = 0; i < npts; ++i){	
 	vis[i] = distribution_w(generator);
-	if((vis[i] < -dw) || (vis[i] > dw)) --i; 
+	if((vis[i] < -2*dw) || (vis[i] > 2*dw)) --i; 
     }
     
     return vis;

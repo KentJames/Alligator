@@ -40,30 +40,32 @@ void grid_correct_sky(vector2D<std::complex<double>>& sky,
     int oversampg = static_cast<int>(std::round(x0ih * grid_size));
 
     //Grid bounds based on throwing away half the map.
-    int sky_bound_low = (oversampg - grid_size)/2;
-    int sky_bound_high = 3 * sky_bound_low;
-    
-
+    double sky_bound_low_theta = -theta/2;
+    double sky_bound_high_theta = theta/2;
     
     // Kernel indexing arithmetic
     int lm_size_t = grid_corr_lm->size * grid_corr_lm->oversampling;
     int n_size_t = grid_corr_n->size * grid_corr_n->oversampling;
     double lm_step = 1.0/(double)lm_size_t;
     double n_step = 1.0/(double)n_size_t;
+
+    double theta_scale = 2 * theta / oversampg;
+    
     // Here we throw away half the map and grid correct what is left
     // As Steve Gull always says, "Throw away half the map, it's useless!!"
     for(int y = 0; y < oversampg ; ++y){
 
-	double m = (theta / oversampg) * (y - oversampg / 2);
+	int true_y = y - grid_size;
+
+	double m = theta_scale * true_y;
 	int mc = static_cast<int>(std::floor((m / theta + 0.5) *
 					     static_cast<double>(grid_size)));
 	double mq = (double)mc/lam - theta/2;
 	
-
-	
 	for(int x = 0; x < oversampg; ++x){
 
-	    double l = (theta / oversampg) * (x - oversampg / 2);
+	    int true_x = x - grid_size;
+	    double l = theta_scale * true_x;
 	    int lc = static_cast<int>(std::floor((l / theta + 0.5) *
 					     static_cast<double>(grid_size)));
 	    double lq = (double)lc/lam - theta/2;
@@ -77,8 +79,8 @@ void grid_correct_sky(vector2D<std::complex<double>>& sky,
 	    a *= grid_corr_lm->data[aav];
 	    a *= grid_corr_n->data[aaw];
 
-	    if( (x >= sky_bound_low && x < sky_bound_high) &&
-		(y >= sky_bound_low && y < sky_bound_high)){
+	    if( (l >= sky_bound_low_theta && l < sky_bound_high_theta) &&
+		(m >= sky_bound_low_theta && m < sky_bound_high_theta)){
 		std::complex<double> source = sky(x,y);
 		source = source/a;
 		sky(x,y) = source;
