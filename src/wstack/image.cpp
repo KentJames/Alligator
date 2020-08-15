@@ -49,7 +49,7 @@ void grid_correct_sky(vector2D<std::complex<double>>& sky,
     double lm_step = 1.0/(double)lm_size_t;
     double n_step = 1.0/(double)n_size_t;
 
-    double theta_scale = 2 * theta / oversampg;
+    double theta_scale = x0ih * theta / oversampg;
     
     // Here we throw away half the map and grid correct what is left
     // As Steve Gull always says, "Throw away half the map, it's useless!!"
@@ -176,6 +176,7 @@ wstack_image(double theta,
     std::cout << "Convolving 3D Visibilities...";
     std::chrono::high_resolution_clock::time_point t_convolve_start =
 	std::chrono::high_resolution_clock::now();
+    
     for(std::size_t i = 0; i < uvwvec.size()/3; ++i){
 	convolve_visibility_(uvwvec[3*i + 0],
 			     uvwvec[3*i + 1],
@@ -192,19 +193,6 @@ wstack_image(double theta,
 			     wstacks,
 			     grid_conv_uv,
 			     grid_conv_w);
-    }
-
-    {
-     		std::ofstream file("convolved_sky.out", std::ios::binary);
-     		double *row = (double*)malloc(sizeof(double) * oversampg);
-     		for(int i = 0; i < oversampg; ++i){
-     		    for(int j = 0; j < oversampg; ++j){
-     			row[j] = wstacks(i,j,w_planes/2).real();
-     		    }
-     		    file.write(reinterpret_cast<char*>(row), sizeof(double) * oversampg );
-     		}
-		free(row);
-
     }
     
     std::chrono::high_resolution_clock::time_point t_convolve_end =
