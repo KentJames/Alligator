@@ -14,6 +14,7 @@
 #include "image.h"
 #ifdef CUDA_ACCELERATION
 #include "predict.cuh"
+#include "image.cuh"
 #endif
 
 void showHelp(){
@@ -255,85 +256,78 @@ int main(int argc, char **argv) {
     std::cout << "Optimum Parameters: " << "\n";
     std::cout << "dw: " << dw << "\n";
     std::cout << "du: " << du << "\n";
+   
+    if (checkCmdLineFlag(argc, (const char **) argv, "pu") == 0 ||
+	checkCmdLineFlag(argc, (const char **) argv, "pv") == 0 ||
+	checkCmdLineFlag(argc, (const char **) argv, "pw") == 0) {
+	std::cout << "No u/v/w co-ordinates specified for predict!\n";
+	showHelp();	  
+	return 0;
+    }
+    else {
+	pu =  getCmdLineArgumentDouble(argc, (const char **) argv, "pu");
+	pv =  getCmdLineArgumentDouble(argc, (const char **) argv, "pv");
+	pw =  getCmdLineArgumentDouble(argc, (const char **) argv, "pw");
+	}
     
-    
-    /* 
-       PREDICT
-    */
-
-
-
-    	if (checkCmdLineFlag(argc, (const char **) argv, "pu") == 0 ||
-	    checkCmdLineFlag(argc, (const char **) argv, "pv") == 0 ||
-	    checkCmdLineFlag(argc, (const char **) argv, "pw") == 0) {
-	    std::cout << "No u/v/w co-ordinates specified for predict!\n";
-	    showHelp();	  
-	    return 0;
-	}
-	else {
-	    pu =  getCmdLineArgumentDouble(argc, (const char **) argv, "pu");
-	    pv =  getCmdLineArgumentDouble(argc, (const char **) argv, "pv");
-	    pw =  getCmdLineArgumentDouble(argc, (const char **) argv, "pw");
-	}
-
-	std::vector<std::complex<double>> visq;
-	std::vector<std::complex<double>>  vis;
-	std::vector<double> points = generate_testcard_dataset(theta);
-	//std::vector<double> points = {0.0,0.0,0.02,0.02,-0.01,0};
- 	std::vector<double> uvec;
-	std::vector<double> vvec;
-	std::vector<double> wvec;
-	std::vector<double> uvwvec(3*npts,0.0);;
-	std::cout << "Rand points: " << random_points << "\n";
-	if(random_points == 0){
-
-	    uvec.resize(npts);
-	    std::fill(uvec.begin(), uvec.end(),pu);
-
-	    vvec.resize(npts);
-	    std::fill(vvec.begin(), vvec.end(),pv);
-
-	    wvec.resize(npts);
-	    std::fill(wvec.begin(), wvec.end(),pw);
+    std::vector<std::complex<double>> visq;
+    std::vector<std::complex<double>>  vis;
+    std::vector<double> points = generate_testcard_dataset(theta);
+    //std::vector<double> points = {0.0,0.0,0.02,0.02,-0.01,0};
+    std::vector<double> uvec;
+    std::vector<double> vvec;
+    std::vector<double> wvec;
+    std::vector<double> uvwvec(3*npts,0.0);;
+    std::cout << "Rand points: " << random_points << "\n";
+    if(random_points == 0){
+	
+	uvec.resize(npts);
+	std::fill(uvec.begin(), uvec.end(),pu);
+	
+	vvec.resize(npts);
+	std::fill(vvec.begin(), vvec.end(),pv);
+	
+	wvec.resize(npts);
+	std::fill(wvec.begin(), wvec.end(),pw);
+	
+    } else if(mode == 1) {
 	    
-	} else if(mode == 1) {
-
-	    uvec = generate_random_visibilities_1D_uv_gaussian(theta,lambda,npts);
-	    vvec = generate_random_visibilities_1D_uv_gaussian(theta,lambda,npts);
-	    wvec = generate_random_visibilities_1D_w_gaussian(theta,lambda,dw,npts);
+	uvec = generate_random_visibilities_1D_uv_gaussian(theta,lambda,npts);
+	vvec = generate_random_visibilities_1D_uv_gaussian(theta,lambda,npts);
+	wvec = generate_random_visibilities_1D_w_gaussian(theta,lambda,dw,npts);
 	    
-	} else {
-	    uvec = generate_random_visibilities_1D_uv(theta,lambda,npts);
-	    vvec = generate_random_visibilities_1D_uv(theta,lambda,npts);
-	    wvec = generate_random_visibilities_1D_w(theta,lambda,dw,npts);
-	}
+    } else {
+	uvec = generate_random_visibilities_1D_uv(theta,lambda,npts);
+	vvec = generate_random_visibilities_1D_uv(theta,lambda,npts);
+	wvec = generate_random_visibilities_1D_w(theta,lambda,dw,npts);
+    }
 	    
 	
-	for (std::size_t i = 0; i < uvec.size(); ++i){
-	    uvwvec[3*i + 0] = uvec[i];
-	    uvwvec[3*i + 1] = vvec[i];
-	    uvwvec[3*i + 2] = wvec[i];	    
-	}
+    for (std::size_t i = 0; i < uvec.size(); ++i){
+	uvwvec[3*i + 0] = uvec[i];
+	uvwvec[3*i + 1] = vvec[i];
+	uvwvec[3*i + 2] = wvec[i];	    
+    }
 
 	
-    	std::cout << "Generating DFT visibilities from sky point source model..." << std::flush;
-	visq = predict_visibility_quantized_vec(points,theta,lambda,uvwvec);
-	std::cout << "done\n" << std::flush;
+    std::cout << "Generating DFT visibilities from sky point source model..." << std::flush;
+    visq = predict_visibility_quantized_vec(points,theta,lambda,uvwvec);
+    std::cout << "done\n" << std::flush;
 
 
     double x0ih = std::round(0.5/x0);
     int grid_size = static_cast<int>(std::floor(theta*lambda));
     int oversampg = static_cast<int>(x0ih * grid_size);
     
-    
+    /* 
+       PREDICT
+    */
     if (mode == 0){
 
 #ifdef CUDA_ACCELERATION
 	if (cuda_acceleration){
 
-	    // Placeholder for now.
-	    // TODO: Add import from file.
-
+	    // Only supports 8x8x4 convolution kernel at present
 	    vis = wstack_predict_cu_3D(theta,
 				       lambda,
 				       points,
@@ -352,8 +346,6 @@ int main(int argc, char **argv) {
 	} else {
 #endif	    
 	    
-	    std::cout << "##### W Stacking #####\n"; 	    
-
 	    vis = wstack_predict(theta,
 				 lambda,
 				 points,
@@ -393,10 +385,26 @@ int main(int argc, char **argv) {
        IMAGE
     */
     else {
+	vector2D<std::complex<double>> wstack_sky;
 #ifdef CUDA_ACCELERATION
 	if(cuda_acceleration){
-	    std::cout << "CUDA Kernels not implemented (yet...) \n";
-	    
+
+	    wstack_sky = wstack_image_cu(theta,
+					 lambda,
+					 visq,
+					 uvec,
+					 vvec,
+					 wvec,
+					 du,
+					 dw,
+					 support_uv,
+					 support_w,
+					 x0,
+					 sepkern_uv,
+					 sepkern_w,
+					 sepkern_lm,
+					 sepkern_n);
+			    
 
 	} else {
 #endif
@@ -404,20 +412,24 @@ int main(int argc, char **argv) {
 	    //std::complex<double> visz = {1.0,0.0};
 	    //for(int i = 0; i < visq.size(); ++i) visq[i] = visz;
 	    std::cout << "Visq example: " << visq[0] << "\n";
-	    vector2D<std::complex<double>> wstack_sky = wstack_image(theta,
-								     lambda,
-								     visq,
-								     uvwvec,
-								     du,
-								     dw,
-								     support_uv,
-								     support_w,
-								     x0,
-								     sepkern_uv,
-								     sepkern_w,
-								     sepkern_lm,
-								     sepkern_n);
-	    std::cout << "Wstack size: " <<  wstack_sky.size() << "\n";
+	    wstack_sky = wstack_image(theta,
+				      lambda,
+				      visq,
+				      uvwvec,
+				      du,
+				      dw,
+				      support_uv,
+				      support_w,
+				      x0,
+				      sepkern_uv,
+				      sepkern_w,
+				      sepkern_lm,
+				      sepkern_n);
+	    
+#ifdef CUDA_ACCELERATION
+	}
+#endif
+		    std::cout << "Wstack size: " <<  wstack_sky.size() << "\n";
 	    std::cout << "Wstack Value at (0,0): " << wstack_sky(oversampg/2,oversampg/2) << "\n";
 	    
 	    // Normalise
@@ -428,7 +440,8 @@ int main(int argc, char **argv) {
 	    std::cout << "Normalised Wstack Value at (0,3): " << wstack_sky(oversampg/2,oversampg/2+3) << "\n";
 	    std::cout << "Normalised Wstack Value at (256,256): " << wstack_sky(oversampg/2+256,oversampg/2+256) << "\n";
 	    std::cout << "Normalised Wstack Value at (0,512): " << wstack_sky(oversampg/2,oversampg/2+512) << "\n";
-	    {
+
+	{
 		std::ofstream file("wstack_sky.out", std::ios::binary);
 		double *row = (double*)malloc(sizeof(double) * oversampg);
 		for(int i = 0; i < oversampg; ++i){
@@ -438,12 +451,8 @@ int main(int argc, char **argv) {
 		    file.write(reinterpret_cast<char*>(row), sizeof(double) * oversampg );
 		}
 
-	    }
-	    
-#ifdef CUDA_ACCELERATION
 	}
-#endif
-	
+	    	
     }
 
     

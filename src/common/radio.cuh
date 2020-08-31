@@ -47,6 +47,40 @@ inline void cufftAssert(cufftResult code, const char *file, int line, bool abort
       Device Functions
 ******************************/
 
+__device__ __forceinline__ double cuda_floor(double x){ return floor(x);}
+__device__ __forceinline__ float cuda_floor(float x){ return floorf(x);}
+
+__device__ __forceinline__ double cuda_ceil(double x){ return ceil(x);}
+__device__ __forceinline__ float cuda_ceil(float x){ return ceilf(x);}
+
+__device__ __forceinline__ double cuda_fabs(double x){ return fabs(x);}
+__device__ __forceinline__ float cuda_fabs(float x){ return fabsf(x);}
+
+// These are prefetching PTX (CUDA assembly) instructions
+
+#if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
+#define PXL_GLOBAL_PTR   "l"
+#else
+#define PXL_GLOBAL_PTR   "r"
+#endif
+
+
+__device__ __forceinline__ void __prefetch_global_l1(const void* const ptr)
+{
+    asm("prefetch.global.L1 [%0];" : : PXL_GLOBAL_PTR(ptr));
+}
+
+__device__ __forceinline__ void __prefetch_global_uniform(const void* const ptr)
+{
+  asm("prefetchu.L1 [%0];" : : PXL_GLOBAL_PTR(ptr));
+}
+
+__device__ __forceinline__ void __prefetch_global_l2(const void* const ptr)
+{
+  asm("prefetch.global.L2 [%0];" : : PXL_GLOBAL_PTR(ptr));
+}
+
+
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600
 
 

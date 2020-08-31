@@ -34,12 +34,12 @@ void grid_correct_sky(vector2D<std::complex<double>>& sky,
 
 
     
-    //Grid Sizes
+    // Grid Sizes
     int grid_size = static_cast<int>(std::floor(theta*lam));
     double x0ih = std::round(0.5/x0);
     int oversampg = static_cast<int>(std::round(x0ih * grid_size));
 
-    //Grid bounds based on throwing away half the map.
+    // Grid bounds based on throwing away half the map.
     double sky_bound_low_theta = -theta/2;
     double sky_bound_high_theta = theta/2;
     

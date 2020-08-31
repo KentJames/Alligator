@@ -52,6 +52,10 @@ libwstack.a: predict.o image.o wstack_common.o
 else
 predict_cu.o: predict.cu
 	$(NVCC) -c $^ -o $@ $(CUDA_FLAGS)
-libwstack.a: predict.o predict_cu.o image.o wstack_common.o
+
+image_cu.o: image.cu
+	$(NVCC) -c $^ -o $@ $(CUDA_FLAGS)
+
+libwstack.a: predict.o predict_cu.o image.o image_cu.o wstack_common.o
 	ar rcs $@ $^
 endif
