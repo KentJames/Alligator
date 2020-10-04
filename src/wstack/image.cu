@@ -57,16 +57,16 @@ __global__ void convolve_3D(thrust::complex<FloatType> *wstacks,
 
 	thrust::complex<FloatType> sum = {0.0,0.0};
 
-	for(int vi = 0; vi < vis_num; ++vi){
+	for(int vis_idx = 0; vis_idx < vis_num; ++vis_idx){
 
-	    FloatType ur = uvec[vi];
-	    FloatType vr = vvec[vi];
-	    FloatType wr = wvec[vi];
+	    FloatType ur = uvec[vis_idx];
+	    FloatType vr = vvec[vis_idx];
+	    FloatType wr = wvec[vis_idx];
 
-	    int ui = cuda_ceil(ur/du) + grid_size - aa_h;
-	    int vi = cuda_ceil(vr/du) + grid_size - aa_h;
-	    int wi = cuda_ceil(wr/dw) + w_planes/2 - aaw_h;
-
+	    int ui = static_cast<int>(cuda_ceil(ur/du)) + grid_size - aa_h;
+	    int vi = static_cast<int>(cuda_ceil(vr/du)) + grid_size - aa_h;
+	    int wi = static_cast<int>(cuda_ceil(wr/dw)) + w_planes/2 - aaw_h;
+	    
 	    FloatType flu = ur - cuda_ceil(ur/du)*du;
 	    FloatType flv = vr - cuda_ceil(vr/du)*du;
 	    FloatType flw = wr - cuda_ceil(wr/dw)*dw;
@@ -93,40 +93,44 @@ __global__ void convolve_3D(thrust::complex<FloatType> *wstacks,
 		myGridW != myW ){
 
 		if( myGridU < 0 ||
-		     myGridV < 0 ||
-		     myGridW < 0 ||
-		     myGridU >= oversampg ||
-		     myGridV >= oversampg ||
-		     myGridW >= w_planes) return;
+		    myGridV < 0 ||
+		    myGridW < 0 ||
+		    myGridU >= oversampg ||
+		    myGridV >= oversampg ||
+		    myGridW >= w_planes) {
+		    continue;
+		} else { 
 
-		// Complex Atomic Add here
-		int mem_offset = 2 * // 2 because grid is interleaved complex array (real/imag/real/imag..)
-		    (myW * oversampg * oversampg +
-		     myV * oversampg + myU);
+		    // Complex Atomic Add here
+		    int mem_offset = 2 * // 2 because grid is interleaved complex array (real/imag/real/imag..)
+			(myW * oversampg * oversampg +
+			 myV * oversampg + myU);
 
-		atomicAdd(((FloatType *)wstacks + mem_offset)    ,sum.real());
-		atomicAdd(((FloatType *)wstacks + mem_offset + 1),sum.imag());
-		
-		thrust::complex<FloatType> zero = {0.0, 0.0};
-		sum = zero;
-		myU = myGridU;
-		myV = myGridV;
-		myW = myGridW;		
+		    atomicAdd(((FloatType *)wstacks) + mem_offset    ,sum.real());
+		    atomicAdd(((FloatType *)wstacks) + mem_offset + 1,sum.imag());
+	    
+		    thrust::complex<FloatType> zero = {0.0, 0.0};
+		    sum = zero;
+		    myU = myGridU;
+		    myV = myGridV;
+		    myW = myGridW;
+		}
 	    }
 
 	    FloatType kernval = gcf_uv[aa_support_uv * ovu + myConvU] *
 		                gcf_uv[aa_support_uv * ovv + myConvV] *
 		                gcf_w[aa_support_w * ovw + myConvW];
 
-	    sum += vis[vi] * kernval;
+	    sum += vis[vis_idx] * kernval;
 
 	}
-	int mem_offset = (myW * oversampg * oversampg +
-			  myV * oversampg + myU);
+
+	int mem_offset = 2 * (myW * oversampg * oversampg +
+			      myV * oversampg + myU);
 
 	
-	atomicAdd(((FloatType *)wstacks + mem_offset)    ,sum.real());
-	atomicAdd(((FloatType *)wstacks + mem_offset + 1),sum.imag());
+	atomicAdd(((FloatType *)wstacks) + mem_offset    ,sum.real());
+	atomicAdd(((FloatType *)wstacks) + mem_offset + 1,sum.imag());
     }
 }
 
@@ -141,6 +145,19 @@ __global__ void add_image(thrust::complex<FloatType> *in,
     if(x < n && y < n){
 	thrust::complex<FloatType> res = in[y * n + x] + out[y * n + x];
 	out[y * n + x] = res;
+    }
+}
+
+template <typename FloatType>
+__global__ void zero_image(thrust::complex<FloatType> *arr,
+			  int n){
+
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if(x < n && y < n){
+	thrust::complex<FloatType> zero = {0.0,0.0};
+	arr[y * n + x] = zero;
     }
 }
 
@@ -284,7 +301,6 @@ wstack_image_cu(double theta,
 
     std::cout << "Max W: " << max_w << "\n";
     std::cout << "W Planes: " << w_planes << "\n";
-
     std::cout << "Copying vis locs to GPU..." << std::flush;
     thrust::host_vector<double> uvec_h(u.size(),0.0);
     thrust::host_vector<double> vvec_h(v.size(),0.0);
@@ -300,7 +316,7 @@ wstack_image_cu(double theta,
 
     std::cout << "Copying visibilities to GPU..." << std::flush;
     thrust::host_vector<thrust::complex<double>> vis_h(vis.size(),{0.0,0.0});
-    std::memcpy(vis_h.data(), vis.data(), sizeof(double) * vis.size());
+    std::memcpy(vis_h.data(), vis.data(),sizeof(std::complex<double>) * vis.size());
     thrust::device_vector<thrust::complex<double>> vis_d = vis_h;
     std::cout << "done\n";
 
@@ -326,19 +342,18 @@ wstack_image_cu(double theta,
     std::size_t wstack_gs = 32;
     dim3 dimGridImage(oversampg/wstack_gs,oversampg/wstack_gs);
     dim3 dimBlockImage(wstack_gs,wstack_gs);
-
+    cudaError_check(cudaDeviceSynchronize());
     // FFT Shift our Fresnel Pattern
     fft_shift_kernel <thrust::complex<double>>
 	<<< dimGridImage, dimBlockImage >>>
     	((thrust::complex<double>*)thrust::raw_pointer_cast(wtransfer_d.data()),
     	oversampg);
-
+    cudaError_check(cudaDeviceSynchronize());
     std::cout << "Starting Convolution..." << std::flush;
     dim3 dimGridConvolve(1,1,1);
     dim3 dimBlockConvolve(aa_support_uv * aa_support_uv * aa_support_w,1,1);
     std::chrono::high_resolution_clock::time_point tcs = std::chrono::high_resolution_clock::now();
-    
-    convolve_3D <double> <<< 1, 32 >>>
+    convolve_3D <double> <<< dimGridConvolve, dimBlockConvolve >>>
 	((thrust::complex<double>*)thrust::raw_pointer_cast(wstacks.data()),
 	 (thrust::complex<double>*)thrust::raw_pointer_cast(vis_d.data()),
 	 (double *)thrust::raw_pointer_cast(uvec_d.data()),
@@ -347,7 +362,7 @@ wstack_image_cu(double theta,
 	 (double *)thrust::raw_pointer_cast(gcf_uv_d.data()),
 	 (double *)thrust::raw_pointer_cast(gcf_w_d.data()),
 	 du, dw,
-	 u.size(),
+	 static_cast<int>(u.size()),
 	 grid_conv_uv->size,
 	 grid_conv_w->size,
 	 grid_conv_uv->oversampling,
@@ -364,17 +379,18 @@ wstack_image_cu(double theta,
     std::cout << "Convolution Time: " << duration_convolve << "ms \n";
 
     std::cout << "Starting W-Stacking..." << std::flush;
+    std::chrono::high_resolution_clock::time_point tws = std::chrono::high_resolution_clock::now();
     for(int wplane = 0; wplane < w_planes; ++wplane){
 	fft_shift_kernel <thrust::complex<double>>
-    	    <<< dimGridImage, dimBlockImage >>>
-    	    ((thrust::complex<double>*)thrust::raw_pointer_cast(&wstacks.data()[wplane * oversampg * oversampg]),
-    	     oversampg);
+	    <<< dimGridImage, dimBlockImage >>>
+	    ((thrust::complex<double>*)thrust::raw_pointer_cast(&wstacks.data()[wplane * oversampg * oversampg]),
+	     oversampg);
 	
 	cuFFTError_check(cufftExecZ2Z(plan,
 				      (cuDoubleComplex*)thrust::raw_pointer_cast(&wstacks.data()[wplane * oversampg * oversampg]),
-    				      (cuDoubleComplex*)thrust::raw_pointer_cast(skyp_d.data()),
+				      (cuDoubleComplex*)thrust::raw_pointer_cast(skyp_d.data()),
     				      
-    				      CUFFT_FORWARD));
+				      CUFFT_FORWARD));
 	fresnel_sky_mul <double>
 	    <<< dimGridImage, dimBlockImage >>>
 	    ((thrust::complex<double>*)thrust::raw_pointer_cast(skyp_d.data()),
@@ -386,13 +402,23 @@ wstack_image_cu(double theta,
 	    ((thrust::complex<double>*)thrust::raw_pointer_cast(skyp_d.data()),
 	     (thrust::complex<double>*)thrust::raw_pointer_cast(skyp_d_out.data()),
 	     oversampg);
+	zero_image <double>
+	    <<< dimGridImage, dimBlockImage >>>
+	    ((thrust::complex<double>*)thrust::raw_pointer_cast(skyp_d.data()), oversampg);
+	    
     }
     fft_shift_kernel <thrust::complex<double>>
 	<<< dimGridImage, dimBlockImage >>>
 	((thrust::complex<double>*)thrust::raw_pointer_cast(skyp_d_out.data()),
 	 oversampg);
+    cudaError_check(cudaDeviceSynchronize());
     cudaError_check(cudaPeekAtLastError());
     std::cout << "done\n";
+     	// add_image <double>
+     	//     <<< dimGridImage, dimBlockImage >>>
+     	//     ((thrust::complex<double>*)thrust::raw_pointer_cast(&wstacks.data()[(w_planes/2) * oversampg * oversampg]),
+     	//      (thrust::complex<double>*)thrust::raw_pointer_cast(skyp_d_out.data()),
+     	//      oversampg);
 
     std::cout << "Applying Grid Correction..." << std::flush;
     grid_correct_sky <double>
@@ -411,9 +437,12 @@ wstack_image_cu(double theta,
 	 grid_corr_n->data,
 	 grid_corr_n->size,
 	 grid_corr_n->oversampling);
+    cudaError_check(cudaPeekAtLastError());
+    cudaError_check(cudaDeviceSynchronize());
+    std::chrono::high_resolution_clock::time_point twe = std::chrono::high_resolution_clock::now();
     std::cout << "done\n";
-
-
+    auto duration_wstack = std::chrono::duration_cast<std::chrono::milliseconds>(twe - tws).count();
+    std::cout << "W-Stack Time: " << duration_wstack << "ms \n";
     
     skyp_h_out = skyp_d_out;
 

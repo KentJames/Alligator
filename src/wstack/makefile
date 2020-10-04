@@ -12,7 +12,8 @@ else
 override LDFLAGS += -L../common -lgomp -lhdf5_cu -lfftw3_threads -lfftw3 -lm -lhdf5 -L$(CUDA_LIBDIR) -lcuda -lcudart -lcufft 
 endif
 
-override CUDA_FLAGS += -std=c++14  -use_fast_math -maxrregcount=64 -I../common -gencode arch=compute_60,code=sm_60
+override CUDA_FLAGS += -std=c++14  -use_fast_math -I../common -gencode arch=compute_60,code=sm_60
+#override CUDA_FLAGS += -std=c++14  -use_fast_math -maxrregcount=64 -I../common -gencode arch=compute_60,code=sm_60
 
 BINDIR = ./
 

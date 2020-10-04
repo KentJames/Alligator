@@ -273,7 +273,7 @@ int main(int argc, char **argv) {
     std::vector<std::complex<double>> visq;
     std::vector<std::complex<double>>  vis;
     std::vector<double> points = generate_testcard_dataset(theta);
-    //std::vector<double> points = {0.0,0.0,0.02,0.02,-0.01,0};
+    //std::vector<double> points = {0.1,0.1};
     std::vector<double> uvec;
     std::vector<double> vvec;
     std::vector<double> wvec;
@@ -388,7 +388,6 @@ int main(int argc, char **argv) {
 	vector2D<std::complex<double>> wstack_sky;
 #ifdef CUDA_ACCELERATION
 	if(cuda_acceleration){
-
 	    wstack_sky = wstack_image_cu(theta,
 					 lambda,
 					 visq,
@@ -430,7 +429,7 @@ int main(int argc, char **argv) {
 	}
 #endif
 		    std::cout << "Wstack size: " <<  wstack_sky.size() << "\n";
-	    std::cout << "Wstack Value at (0,0): " << wstack_sky(oversampg/2,oversampg/2) << "\n";
+		    std::cout << "Wstack Value at (0,0): " << wstack_sky(oversampg/2,oversampg/2).real() <<  " " << wstack_sky(oversampg/2,oversampg/2).imag() << "\n";
 	    
 	    // Normalise
 	    for(int i = 0; i < wstack_sky.size(); ++i) wstack_sky(i) /= (float)visq.size();
@@ -440,6 +439,7 @@ int main(int argc, char **argv) {
 	    std::cout << "Normalised Wstack Value at (0,3): " << wstack_sky(oversampg/2,oversampg/2+3) << "\n";
 	    std::cout << "Normalised Wstack Value at (256,256): " << wstack_sky(oversampg/2+256,oversampg/2+256) << "\n";
 	    std::cout << "Normalised Wstack Value at (0,512): " << wstack_sky(oversampg/2,oversampg/2+512) << "\n";
+	    std::cout << "Normalised Wstack Value at (128,0): " << wstack_sky(oversampg/2 + 128,oversampg/2) << "\n";
 
 	{
 		std::ofstream file("wstack_sky.out", std::ios::binary);
