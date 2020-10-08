@@ -351,26 +351,90 @@ wstack_image_cu(double theta,
     cudaError_check(cudaDeviceSynchronize());
     std::cout << "Starting Convolution..." << std::flush;
     dim3 dimGridConvolve(1,1,1);
+
+    // We might want to check this again if we end up running large convolutions.
     dim3 dimBlockConvolve(aa_support_uv * aa_support_uv * aa_support_w,1,1);
+
+
+    // Work out how many parallel gridders to get going. Try and have each gridder doing ~1e5
+    // visibilities each.
+    int number_of_visibilities = static_cast<int>(u.size());
+    int total_gridders = number_of_visibilities / VIS_PER_GRIDDER;
+    int remainder_visibilities = number_of_visibilities % VIS_PER_GRIDDER;
+
+
+#ifndef CUDA_NO_PARALLEL_STREAMS
+    cudaStream_t *streams = (cudaStream_t *)malloc(total_gridders * sizeof(cudaStream_t));
+    for(int sIdx = 0; sIdx < total_gridders; ++sIdx)
+	cudaError_check(cudaStreamCreate(&streams[sIdx]));
+#endif
     std::chrono::high_resolution_clock::time_point tcs = std::chrono::high_resolution_clock::now();
-    convolve_3D <double> <<< dimGridConvolve, dimBlockConvolve >>>
-	((thrust::complex<double>*)thrust::raw_pointer_cast(wstacks.data()),
-	 (thrust::complex<double>*)thrust::raw_pointer_cast(vis_d.data()),
-	 (double *)thrust::raw_pointer_cast(uvec_d.data()),
-	 (double *)thrust::raw_pointer_cast(vvec_d.data()),
-	 (double *)thrust::raw_pointer_cast(wvec_d.data()),
-	 (double *)thrust::raw_pointer_cast(gcf_uv_d.data()),
-	 (double *)thrust::raw_pointer_cast(gcf_w_d.data()),
-	 du, dw,
-	 static_cast<int>(u.size()),
-	 grid_conv_uv->size,
-	 grid_conv_w->size,
-	 grid_conv_uv->oversampling,
-	 grid_conv_w->oversampling,
-	 w_planes,
-	 grid_size,
-	 oversampg);
-	 
+#ifndef CUDA_NO_PARALLEL_STREAMS
+    for(int gridderIdx = 0; gridderIdx < total_gridders; ++gridderIdx){
+
+	int vis_offset = gridderIdx * VIS_PER_GRIDDER;
+	convolve_3D <double>
+	    <<< dimGridConvolve, dimBlockConvolve, 0, streams[gridderIdx] >>>
+	    ((thrust::complex<double>*)thrust::raw_pointer_cast(wstacks.data()),
+	     (thrust::complex<double>*)thrust::raw_pointer_cast(&vis_d.data()[vis_offset]),
+	     (double *)thrust::raw_pointer_cast(&uvec_d.data()[vis_offset]),
+	     (double *)thrust::raw_pointer_cast(&vvec_d.data()[vis_offset]),
+	     (double *)thrust::raw_pointer_cast(&wvec_d.data()[vis_offset]),
+	     (double *)thrust::raw_pointer_cast(gcf_uv_d.data()),
+	     (double *)thrust::raw_pointer_cast(gcf_w_d.data()),
+	     du, dw,
+	     VIS_PER_GRIDDER,
+	     grid_conv_uv->size,
+	     grid_conv_w->size,
+	     grid_conv_uv->oversampling,
+	     grid_conv_w->oversampling,
+	     w_planes,
+	     grid_size,
+	     oversampg);
+    }
+    if(remainder_visibilities > 0){
+	int final_vis_offset = total_gridders * VIS_PER_GRIDDER;
+	convolve_3D <double>
+	    <<< dimGridConvolve, dimBlockConvolve >>>
+	    ((thrust::complex<double>*)thrust::raw_pointer_cast(wstacks.data()),
+	     (thrust::complex<double>*)thrust::raw_pointer_cast(&vis_d.data()[final_vis_offset]),
+	     (double *)thrust::raw_pointer_cast(&uvec_d.data()[final_vis_offset]),
+	     (double *)thrust::raw_pointer_cast(&vvec_d.data()[final_vis_offset]),
+	     (double *)thrust::raw_pointer_cast(&wvec_d.data()[final_vis_offset]),
+	     (double *)thrust::raw_pointer_cast(gcf_uv_d.data()),
+	     (double *)thrust::raw_pointer_cast(gcf_w_d.data()),
+	     du, dw,
+	     remainder_visibilities,
+	     grid_conv_uv->size,
+	     grid_conv_w->size,
+	     grid_conv_uv->oversampling,
+	     grid_conv_w->oversampling,
+	     w_planes,
+	     grid_size,
+	     oversampg);
+	
+    }
+#else
+	convolve_3D <double>
+	    <<< dimGridConvolve, dimBlockConvolve >>>
+	    ((thrust::complex<double>*)thrust::raw_pointer_cast(wstacks.data()),
+	     (thrust::complex<double>*)thrust::raw_pointer_cast(vis_d.data()),
+	     (double *)thrust::raw_pointer_cast(uvec_d.data()),
+	     (double *)thrust::raw_pointer_cast(vvec_d.data()),
+	     (double *)thrust::raw_pointer_cast(wvec_d.data()),
+	     (double *)thrust::raw_pointer_cast(gcf_uv_d.data()),
+	     (double *)thrust::raw_pointer_cast(gcf_w_d.data()),
+	     du, dw,
+	     static_cast<int>(u.size());,
+	     grid_conv_uv->size,
+	     grid_conv_w->size,
+	     grid_conv_uv->oversampling,
+	     grid_conv_w->oversampling,
+	     w_planes,
+	     grid_size,
+	     oversampg);
+#endif
+    
 	 
     cudaError_check(cudaDeviceSynchronize());
     std::chrono::high_resolution_clock::time_point tce = std::chrono::high_resolution_clock::now();

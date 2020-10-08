@@ -1,6 +1,8 @@
 #ifndef IMAGE_CUH
 #define IMAGE_CUH
 
+#define VIS_PER_GRIDDER 10000
+
 __host__ vector2D<std::complex<double>>
 wstack_image_cu(double theta,
 		double lam,
