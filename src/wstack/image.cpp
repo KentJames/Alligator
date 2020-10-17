@@ -164,7 +164,7 @@ wstack_image(double theta,
     iodims_howmany[0].is = 1;
     iodims_howmany[0].os = 1;
     // Here we do the transforms in-place to save memory
-    for(std::size_t i = 0; i < w_planes; ++i){
+    for(int i = 0; i < w_planes; ++i){
 	plan[i] = fftw_plan_guru_dft(2, iodims_plane, 1, iodims_howmany,
 			      reinterpret_cast<fftw_complex*>(wstacks.pp(i)),
 			      reinterpret_cast<fftw_complex*>(wstacks.pp(i)),
@@ -211,7 +211,7 @@ wstack_image(double theta,
 	std::chrono::high_resolution_clock::now();
 
     // FFT and multiply in our fresnel pattern
-    for(std::size_t i = 0; i < w_planes; ++i){
+    for(int i = 0; i < w_planes; ++i){
 	fft_shift_2Darray(wstacks,i);
 	fftw_execute(plan[i]);
 	multiply_fresnel_pattern(wtransfer,
@@ -219,8 +219,8 @@ wstack_image(double theta,
 				 w_planes/2 - i,
 				 i);
 	// Iteratively add this back to the sky reconstruction.
-	for(std::size_t v = 0; v < oversampg; ++v){
-	    for(std::size_t u = 0; u < oversampg; ++u){
+	for(int v = 0; v < oversampg; ++v){
+	    for(int u = 0; u < oversampg; ++u){
 		sky(u,v) += wstacks(u,v,i);
 	    }
 	}

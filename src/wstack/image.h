@@ -18,9 +18,6 @@ convolve_visibility_(double u,
 		     struct sep_kernel_data *grid_conv_uv,
 		     struct sep_kernel_data *grid_conv_w){
     
-    // Begin De-convolution process using Sze-Tan Kernels.
-    std::complex<double> vis_sze = {0.0,0.0};
-
     // U/V/W oversample values
     double flu = u - std::ceil(u/du)*du;
     double flv = v - std::ceil(v/du)*du;

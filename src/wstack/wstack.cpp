@@ -214,44 +214,44 @@ int main(int argc, char **argv) {
     }
 
 
-    struct sep_kernel_data *sepkern_uv = (struct sep_kernel_data*)malloc(sizeof(struct sep_kernel_data));
-    struct sep_kernel_data *sepkern_w = (struct sep_kernel_data*)malloc(sizeof(struct sep_kernel_data));
-    struct sep_kernel_data *sepkern_lm = (struct sep_kernel_data*)malloc(sizeof(struct sep_kernel_data));
-    struct sep_kernel_data *sepkern_n = (struct sep_kernel_data*)malloc(sizeof(struct sep_kernel_data));
+    struct sep_kernel_data sepkern_uv;
+    struct sep_kernel_data sepkern_w;
+    struct sep_kernel_data sepkern_lm;
+    struct sep_kernel_data sepkern_n;
 
 #ifdef CUDA_ACCELERATION
     if(cuda_acceleration){
 
 	std::cout << "Loading Kernel...";
-	load_sep_kern_CUDA_T(sepkern_uv_file,sepkern_uv);
+	load_sep_kern_CUDA_T(sepkern_uv_file,&sepkern_uv);
 	std::cout << "Loading W Kernel...";
-	load_sep_kern_CUDA_T(sepkern_w_file,sepkern_w);
+	load_sep_kern_CUDA_T(sepkern_w_file,&sepkern_w);
 	
 	std::cout << "Loading AA Kernel...";
-	load_sep_kern_CUDA(sepkern_lm_file, sepkern_lm);
+	load_sep_kern_CUDA(sepkern_lm_file, &sepkern_lm);
 	std::cout << "Loading AA Kernel...";
-	load_sep_kern_CUDA(sepkern_n_file, sepkern_n);
+	load_sep_kern_CUDA(sepkern_n_file, &sepkern_n);
 	
     } else {
 #endif
 	std::cout << "Loading Kernel...";
-	load_sep_kern_T(sepkern_uv_file,sepkern_uv);
+	load_sep_kern_T(sepkern_uv_file,&sepkern_uv);
 	std::cout << "Loading W Kernel...";
-	load_sep_kern_T(sepkern_w_file,sepkern_w);
+	load_sep_kern_T(sepkern_w_file,&sepkern_w);
 	
 	std::cout << "Loading AA Kernel...";
-	load_sep_kern(sepkern_lm_file, sepkern_lm);
+	load_sep_kern(sepkern_lm_file, &sepkern_lm);
 	std::cout << "Loading AA Kernel...";
-	load_sep_kern(sepkern_n_file, sepkern_n);
+	load_sep_kern(sepkern_n_file, &sepkern_n);
 #ifdef CUDA_ACCELERATION
     } 
 #endif
-    double du = sepkern_uv->du;
-    double dw = sepkern_w->dw;
-    double x0 = sepkern_lm->x0;
+    double du = sepkern_uv.du;
+    double dw = sepkern_w.dw;
+    double x0 = sepkern_lm.x0;
 
-    int support_uv = sepkern_uv->size;
-    int support_w = sepkern_w->size;
+    int support_uv = sepkern_uv.size;
+    int support_w = sepkern_w.size;
 
     std::cout << "Optimum Parameters: " << "\n";
     std::cout << "dw: " << dw << "\n";
@@ -338,10 +338,10 @@ int main(int argc, char **argv) {
 				       support_uv,
 				       support_w,
 				       x0,
-				       sepkern_uv,
-				       sepkern_w,
-				       sepkern_lm,
-				       sepkern_n);
+				       &sepkern_uv,
+				       &sepkern_w,
+				       &sepkern_lm,
+				       &sepkern_n);
 				    
 	} else {
 #endif	    
@@ -355,10 +355,10 @@ int main(int argc, char **argv) {
 				 support_uv,
 				 support_w,
 				 x0,
-				 sepkern_uv,
-				 sepkern_w,
-				 sepkern_lm,
-				 sepkern_n);
+				 &sepkern_uv,
+				 &sepkern_w,
+				 &sepkern_lm,
+				 &sepkern_n);
 #ifdef CUDA_ACCELERATION
 	}
 #endif	
@@ -399,10 +399,10 @@ int main(int argc, char **argv) {
 					 support_uv,
 					 support_w,
 					 x0,
-					 sepkern_uv,
-					 sepkern_w,
-					 sepkern_lm,
-					 sepkern_n);
+					 &sepkern_uv,
+					 &sepkern_w,
+					 &sepkern_lm,
+					 &sepkern_n);
 			    
 
 	} else {
@@ -420,10 +420,10 @@ int main(int argc, char **argv) {
 				      support_uv,
 				      support_w,
 				      x0,
-				      sepkern_uv,
-				      sepkern_w,
-				      sepkern_lm,
-				      sepkern_n);
+				      &sepkern_uv,
+				      &sepkern_w,
+				      &sepkern_lm,
+				      &sepkern_n);
 	    
 #ifdef CUDA_ACCELERATION
 	}
@@ -432,7 +432,7 @@ int main(int argc, char **argv) {
 		    std::cout << "Wstack Value at (0,0): " << wstack_sky(oversampg/2,oversampg/2).real() <<  " " << wstack_sky(oversampg/2,oversampg/2).imag() << "\n";
 	    
 	    // Normalise
-	    for(int i = 0; i < wstack_sky.size(); ++i) wstack_sky(i) /= (float)visq.size();
+	    for(std::size_t i = 0; i < wstack_sky.size(); ++i) wstack_sky(i) /= (float)visq.size();
 	    std::cout << "Normalised Wstack Value at (0,0): " << wstack_sky(oversampg/2,oversampg/2) << "\n";
 	    std::cout << "Normalised Wstack Value at (0,1): " << wstack_sky(oversampg/2,oversampg/2+1) << "\n";
 	    std::cout << "Normalised Wstack Value at (0,2): " << wstack_sky(oversampg/2,oversampg/2+2) << "\n";
@@ -456,12 +456,6 @@ int main(int argc, char **argv) {
     }
 
     
-    free(sepkern_uv);
-    free(sepkern_w);
-    free(sepkern_lm);
-    free(sepkern_n);
-
-
     
     return 0;
 }

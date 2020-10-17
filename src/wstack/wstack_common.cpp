@@ -266,7 +266,7 @@ void memcpy_plane_to_stack(vector2D<std::complex<double>>&plane,
     //Assume strides for n=1 and n=2 dimensions are the same between
     //stacks and plane. If they aren't then can't use memcpy directly.
 
-    std::size_t p1s,p2s,s1s,s2s,s3s,p1d,p2d,s1d,s2d;
+    std::size_t p1s,p2s,s1s,s2s,p1d,p2d,s1d,s2d;//,s3s;
 
 
     p1d = plane.d1s();
@@ -283,7 +283,7 @@ void memcpy_plane_to_stack(vector2D<std::complex<double>>&plane,
     p2s = plane.s2s();
     s1s = stacks.s1s();
     s2s = stacks.s2s();
-    s3s = stacks.s3s();
+    //s3s = stacks.s3s();
     
     // Let us really make sure the strides are the same
     assert(p1s == s1s);
