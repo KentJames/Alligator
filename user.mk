@@ -3,9 +3,9 @@ CXX           = g++
 NVCC          = nvcc
 LINKER        = g++
 CPPFLAGS      ?=
-CXXFLAGS      ?= -O3 -Wall -pedantic 
+CXXFLAGS      ?= -O3 -Wall -pedantic -I/opt/homebrew/include/
 NVCCFLAGS     ?= -O3 -Xcompiler "-Wall" #-Xptxas -v
-LDFLAGS       ?=
+LDFLAGS       ?= -L/opt/homebrew/lib/
 DOXYGEN       ?= doxygen
 PYBUILDFLAGS   ?=
 PYINSTALLFLAGS ?=
@@ -21,4 +21,4 @@ CUDA_INCDIR   ?= $(CUDA_HOME)/include
 
 ALIGNMENT ?= 4096 # Memory allocation alignment
 
-CUDA = 1 # Enables CUDA Acceleration
+#CUDA = 1 # Enables CUDA Acceleration

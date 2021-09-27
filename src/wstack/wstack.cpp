@@ -8,7 +8,7 @@
 
 //CUDA Includes
 
-#include "helper_string.h"
+#include "../common/helper_string.h"
 #include "wstack_common.h"
 #include "predict.h"
 #include "image.h"

@@ -1,6 +1,6 @@
 #ifndef HDF5_CUH
 #define HDF5_CUH
-
+#include <stdint.h>
 #ifdef CUDA_ACCELERATION
 #include "cuda.h"
 #include "cuda_runtime_api.h"

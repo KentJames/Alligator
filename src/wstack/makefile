@@ -1,7 +1,7 @@
 include ../../user.mk
 
 ifndef CUDA
-override CXXFLAGS += -fopenmp -std=c++14 -I../common
+override CXXFLAGS += -fopenmp -std=c++14
 else
 override CXXFLAGS += -g -fopenmp -DCUDA_ACCELERATION -std=c++14 -I../common -I/usr/local/cuda/include 
 endif
@@ -12,7 +12,7 @@ else
 override LDFLAGS += -L../common -lgomp -lhdf5_cu -lfftw3_threads -lfftw3 -lm -lhdf5 -L$(CUDA_LIBDIR) -lcuda -lcudart -lcufft 
 endif
 
-override CUDA_FLAGS += -std=c++14  -use_fast_math -I../common -gencode arch=compute_60,code=sm_60
+override CUDA_FLAGS += -std=c++14  -use_fast_math -gencode arch=compute_60,code=sm_60
 #override CUDA_FLAGS += -std=c++14  -use_fast_math -maxrregcount=64 -I../common -gencode arch=compute_60,code=sm_60
 
 BINDIR = ./

@@ -1,10 +1,11 @@
-#include "hdf5.cuh"
+#include "../common/hdf5.cuh"
 
 #ifndef WSTACK_H
 #define WSTACK_H
 
 #define THREADS_BLOCK 16
 
+#include <iostream>
 #include <vector>
 #include <complex>
 #include <cassert>
@@ -362,22 +363,22 @@ void memcpy_plane_to_stack(vector2D<T>&plane,
 
 
 
-void multiply_fresnel_pattern(vector2D<std::complex<double>>& fresnel,
-			      vector3D<std::complex<double>>& sky,
+void multiply_fresnel_pattern(vector2D<std::complex<double> >& fresnel,
+			      vector3D<std::complex<double> >& sky,
 			      int t,
 			      std::size_t planei);
 
-void multiply_fresnel_pattern(vector2D<std::complex<double>>& fresnel,
-			      vector2D<std::complex<double>>& sky,
+void multiply_fresnel_pattern(vector2D<std::complex<double> >& fresnel,
+			      vector2D<std::complex<double> >& sky,
 			      int t);
 
-void memcpy_plane_to_stack(vector2D<std::complex<double>>&plane,
-			   vector3D<std::complex<double>>&stacks,
+void memcpy_plane_to_stack(vector2D<std::complex<double> >&plane,
+			   vector3D<std::complex<double> >&stacks,
 			   std::size_t grid_size,
 			   std::size_t planei,
 			   std::size_t direction = 1);
 
-vector2D<std::complex<double>>
+vector2D<std::complex<double> >
 generate_fresnel(double theta,
 		 double lam,
 		 double dw,
@@ -385,7 +386,7 @@ generate_fresnel(double theta,
 
 //Quantises our sources onto the sky.
 void generate_sky(const std::vector<double>& points,
-		  vector2D<std::complex<double>>& sky, // We do this by reference because of FFTW planner.
+		  vector2D<std::complex<double> >& sky, // We do this by reference because of FFTW planner.
 		  double theta,
 		  double lam,
 		  double du,
@@ -400,13 +401,13 @@ std::vector<double> generate_testcard_dataset_simple(double theta);
 
 // Various inlines for generating visibilities, mostly useful for /test
 
-static inline std::vector<std::vector<double>> generate_random_visibilities(double theta,
+static inline std::vector<std::vector<double> > generate_random_visibilities(double theta,
 							      double lambda,
 							      double dw,
 							      int npts){
 
     
-    std::vector<std::vector<double>> vis(npts, std::vector<double>(3,0.0));
+    std::vector<std::vector<double> > vis(npts, std::vector<double>(3,0.0));
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator;
     generator.seed(seed);
@@ -514,14 +515,14 @@ static inline std::vector<double> generate_random_visibilities_1D_w_gaussian(dou
 
 
 
-static inline std::vector<std::vector<double>> generate_line_visibilities(double theta,
+static inline std::vector<std::vector<double> > generate_line_visibilities(double theta,
 							    double lambda,
 							    double v,
 							    double dw,
 							      int npts){
 
     
-    std::vector<std::vector<double>> vis(npts, std::vector<double>(3,0.0));
+    std::vector<std::vector<double> > vis(npts, std::vector<double>(3,0.0));
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator;
     generator.seed(seed);
